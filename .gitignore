@@ -1,0 +1,41 @@
+# Python
+translation-backend/venv/
+translation-backend/__pycache__/
+translation-backend/app/__pycache__/
+translation-backend/app/routers/__pycache__/
+translation-backend/app/services/__pycache__/
+translation-backend/*.pyc
+translation-backend/transcripts.jsonl
+translation-backend/test_audio.wav
+translation-backend/.env
+
+# Node / React Native
+VideoTranslatorApp/node_modules/
+VideoTranslatorApp/.metro-cache/
+
+# Android build
+VideoTranslatorApp/android/.gradle/
+VideoTranslatorApp/android/build/
+VideoTranslatorApp/android/app/build/
+VideoTranslatorApp/android/local.properties
+VideoTranslatorApp/android/.kotlin/
+
+# iOS
+VideoTranslatorApp/ios/build/
+VideoTranslatorApp/ios/Pods/
+VideoTranslatorApp/ios/.xcode.env.local
+
+# Genel
+.DS_Store
+*.log
+*.png
+screen*.png
+.claude/
+
+# Temp scripts
+fix*.ps1
+setup*.ps1
+src_files/
+analyze.py
+get_transcript.py
+compare_transcript.py

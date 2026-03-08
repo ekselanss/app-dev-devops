@@ -1,0 +1,10 @@
+fastapi==0.135.1
+uvicorn[standard]==0.41.0
+websockets==16.0
+faster-whisper==1.2.1
+numpy==2.4.2
+soundfile==0.13.1
+httpx==0.28.1
+python-dotenv==1.2.2
+pydantic==2.12.5
+yt-dlp==2026.3.3
