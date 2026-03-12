@@ -215,7 +215,7 @@ export function TranslatorScreen() {
         <View style={styles.modeBadgeRow}>
           <View style={styles.modeBadge}>
             <Text style={styles.modeBadgeText}>
-              {useSpeechMode ? '🎙 Konuşma Tanıma' : '🎤 Mikrofon + Whisper'}
+              {useSpeechMode ? '🎙 Konuşma Tanıma' : '🎤 Mikrofon → Whisper AI'}
             </Text>
           </View>
         </View>

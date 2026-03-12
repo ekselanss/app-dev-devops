@@ -27,7 +27,8 @@ class CaptionBridgeService {
   private _isRunning = false;
 
   getMode(): CaptionMode {
-    if (Platform.OS === 'android' && SpeechRecognizerModule) return 'speech';
+    // Android: SpeechRecognizer AudioFocus çaldığı için YouTube/Instagram durdurur,
+    // her 5sn'de bip sesi çalar → kullanılamaz. Whisper + AudioRecord kullanılır.
     if (Platform.OS === 'ios' && SpeechModule) return 'speech';
     return 'unavailable';
   }
@@ -58,9 +59,8 @@ class CaptionBridgeService {
     this.subscriptions.forEach(s => s?.remove?.());
     this.subscriptions = [];
 
-    const module = Platform.OS === 'android' ? SpeechRecognizerModule : SpeechModule;
-    if (module) {
-      try { await module.stopListening(); } catch {}
+    if (Platform.OS === 'ios' && SpeechModule) {
+      try { await SpeechModule.stopListening(); } catch {}
     }
 
     this.statusHandler?.('stopped');
@@ -70,7 +70,7 @@ class CaptionBridgeService {
   // iOS:     SpeechModule
   // İkisi aynı event formatını kullanır: onSpeechText / onSpeechStatus
   private async _startSpeech(languageCode: string): Promise<boolean> {
-    const module = Platform.OS === 'android' ? SpeechRecognizerModule : SpeechModule;
+    const module = SpeechModule;
     if (!module) return false;
 
     try {
