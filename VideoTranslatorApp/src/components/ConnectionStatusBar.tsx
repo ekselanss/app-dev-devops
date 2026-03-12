@@ -21,7 +21,7 @@ const STATUS_CONFIG: Record<Status, { label: string; color: string; icon: string
 
 export function ConnectionStatusBar({ status }: ConnectionStatusBarProps) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const config = STATUS_CONFIG[status];
+  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG['connecting'];
 
   // Bağlanıyor animasyonu
   useEffect(() => {

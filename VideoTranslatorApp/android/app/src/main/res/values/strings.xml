@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">VideoTranslatorApp</string>
+    <string name="live_caption_service_description">VideoÇeviri, Live Caption metnini okuyarak gerçek zamanlı Türkçe çeviri yapar.</string>
 </resources>

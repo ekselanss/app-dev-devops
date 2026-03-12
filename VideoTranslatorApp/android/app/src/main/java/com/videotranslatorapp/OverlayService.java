@@ -64,12 +64,16 @@ public class OverlayService extends Service {
         tvOriginal = new TextView(this);
         tvOriginal.setTextColor(Color.argb(180, 220, 220, 220));
         tvOriginal.setTextSize(13f);
+        tvOriginal.setMaxLines(2);
+        tvOriginal.setEllipsize(android.text.TextUtils.TruncateAt.END);
         tvOriginal.setVisibility(View.GONE);
         overlayView.addView(tvOriginal);
 
         tvTranslated = new TextView(this);
         tvTranslated.setTextColor(Color.WHITE);
         tvTranslated.setTextSize(16f);
+        tvTranslated.setMaxLines(3);
+        tvTranslated.setEllipsize(android.text.TextUtils.TruncateAt.END);
         tvTranslated.setText("Dinleniyor...");
         overlayView.addView(tvTranslated);
 
@@ -125,12 +129,11 @@ public class OverlayService extends Service {
             if (translated != null && !translated.isEmpty()) {
                 tvTranslated.setText(translated);
             }
-            if (original != null && !original.isEmpty()) {
+            // Original metni sakla ama gösterme — ekranı kaplıyor
+            if (original != null) {
                 tvOriginal.setText(original);
-                tvOriginal.setVisibility(View.VISIBLE);
-            } else {
-                tvOriginal.setVisibility(View.GONE);
             }
+            // tvOriginal.setVisibility(View.GONE) — kullanıcı toggle ile açabilir
         });
     }
 

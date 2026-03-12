@@ -10,6 +10,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    env_file:
+      - ./translation-backend/.env
     environment:
       - DEEPL_API_KEY=${DEEPL_API_KEY:-}
       - LOG_LEVEL=info
@@ -17,12 +19,20 @@ services:
       - WORKERS=1
     volumes:
       - whisper-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 90s
     networks:
       - videocheviri-net
 

@@ -1,13 +1,19 @@
-import torch
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 router = APIRouter()
 
+try:
+    import torch
+    _TORCH_AVAILABLE = True
+except ImportError:
+    _TORCH_AVAILABLE = False
+
 
 class HealthResponse(BaseModel):
     status: str
     whisper_loaded: bool
+    whisper_model: str
     device: str
     gpu_available: bool
     active_sessions: int
@@ -22,8 +28,9 @@ async def health_check(request: Request):
     return HealthResponse(
         status="ok",
         whisper_loaded=whisper is not None and whisper.model is not None,
-        device=whisper.device if whisper else "unknown",
-        gpu_available=torch.cuda.is_available(),
+        whisper_model=getattr(whisper, "model_name", "unknown") if whisper else "unknown",
+        device=getattr(whisper, "device", "cpu") if whisper else "unknown",
+        gpu_available=_TORCH_AVAILABLE and torch.cuda.is_available(),
         active_sessions=len(session_manager.active_sessions)
     )
 

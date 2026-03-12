@@ -15,9 +15,11 @@ class WhisperService:
     def __init__(self, model_name: str = "base"):
         self.model_name = model_name
         self.model = None
-        # Dil kilidi: 3 ardışık yüksek-güvenilirlikli tespitte dili sabitler
-        self._locked_language: str | None = None
-        self._lock_votes: int = 0
+        self.device = "cpu"
+        # Dil kilidi: İngilizce kilitli başla (TRT World, YouTube EN içerik)
+        # 5+ farklı dil tespiti gelirse kilit kırılır
+        self._locked_language: str | None = "en"
+        self._lock_votes: int = 5
 
     async def load_model(self):
         from faster_whisper import WhisperModel

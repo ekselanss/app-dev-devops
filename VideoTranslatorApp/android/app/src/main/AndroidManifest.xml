@@ -1,4 +1,5 @@
-﻿<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
@@ -7,6 +8,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
       android:name=".MainApplication"
@@ -29,20 +31,35 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
-            <service android:name=".AudioForegroundService" android:foregroundServiceType="microphone|mediaProjection" android:exported="false" />
-            <service android:name=".OverlayService" android:exported="false" />
-            <receiver android:name=".NotificationActionReceiver" android:exported="false" />
-            <service
-                android:name=".TranslatorTileService"
-                android:icon="@drawable/ic_tile"
-                android:label="Video Çeviri"
-                android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
-                android:exported="true">
-                <intent-filter>
-                    <action android:name="android.service.quicksettings.action.QS_TILE" />
-                </intent-filter>
-            </service>
+
+      <service android:name=".AudioForegroundService"
+          android:foregroundServiceType="microphone|mediaProjection"
+          android:exported="false" />
+      <service android:name=".OverlayService" android:exported="false" />
+      <receiver android:name=".NotificationActionReceiver" android:exported="false" />
+
+      <!-- Live Caption Accessibility Service -->
+      <service
+          android:name=".LiveCaptionService"
+          android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+          android:exported="true">
+          <intent-filter>
+              <action android:name="android.accessibilityservice.AccessibilityService" />
+          </intent-filter>
+          <meta-data
+              android:name="android.accessibilityservice"
+              android:resource="@xml/live_caption_service_config" />
+      </service>
+
+      <service
+          android:name=".TranslatorTileService"
+          android:icon="@drawable/ic_tile"
+          android:label="Video Çeviri"
+          android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+          android:exported="true">
+          <intent-filter>
+              <action android:name="android.service.quicksettings.action.QS_TILE" />
+          </intent-filter>
+      </service>
     </application>
 </manifest>
-
-

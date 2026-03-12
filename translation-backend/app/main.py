@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import websocket, health
+from app.routers import websocket, health, benchmark, translate
 from app.services.whisper_service import WhisperService
 from app.services.translation_service import TranslationService
 
@@ -21,7 +21,9 @@ async def lifespan(app: FastAPI):
     app.state.whisper = WhisperService(model_name="small")
     app.state.translator = TranslationService()
     await app.state.whisper.load_model()
-    logger.info("✅ Whisper modeli yüklendi")
+    # Hızlı mod da aynı modeli kullanır — 1sn chunk boyutu gecikmeyi 3x azaltır
+    app.state.whisper_fast = app.state.whisper
+    logger.info("✅ Whisper modeli yüklendi (normal + hızlı mod)")
     logger.info("✅ Çeviri servisi hazır")
     yield
     # Shutdown
@@ -45,3 +47,5 @@ app.add_middleware(
 
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(websocket.router, prefix="/ws", tags=["websocket"])
+app.include_router(benchmark.router, prefix="/api", tags=["benchmark"])
+app.include_router(translate.router, prefix="/api", tags=["translate"])

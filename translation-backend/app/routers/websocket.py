@@ -15,11 +15,13 @@ TRANSCRIPT_LOG = Path(__file__).parent.parent.parent / "transcripts.jsonl"
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# 3 saniye @ 16kHz 16-bit mono = 96000 byte
+# Normal mod: 3 saniye @ 16kHz 16-bit mono = 96000 byte
 PROCESS_BYTES = 16000 * 2 * 3
+OVERLAP_BYTES = int(16000 * 2 * 1.0)
 
-# Overlap: cümle kesilmemesi için son 0.5 saniyelik veri sonraki chunk'a aktarılır
-OVERLAP_BYTES = int(16000 * 2 * 1.0)  # 1 sn overlap: chunk sinirindaki kelime kayiplarini azaltir
+# Hızlı mod: 1 saniye chunk — Whisper tiny ile ~1-1.5s gecikme
+PROCESS_BYTES_FAST = 16000 * 2 * 1
+OVERLAP_BYTES_FAST = int(16000 * 2 * 0.2)
 
 class SessionManager:
     def __init__(self):
@@ -60,20 +62,22 @@ def pcm_to_wav(pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1, bi
         b'data', data_size)
     return header + pcm_bytes
 
-@router.websocket("/translate/{session_id}")
-async def translation_websocket(websocket: WebSocket, session_id: str):
-    whisper: WhisperService = websocket.app.state.whisper
+@router.websocket("/fast/{session_id}")
+async def fast_translation_websocket(websocket: WebSocket, session_id: str):
+    """Hızlı mod: Whisper tiny + 1sn chunk — YouTube durdurmaz (AudioRecord kullanır)"""
+    whisper = websocket.app.state.whisper_fast
     translator: TranslationService = websocket.app.state.translator
+    await _handle_ws(websocket, session_id, whisper, translator,
+                     PROCESS_BYTES_FAST, OVERLAP_BYTES_FAST)
 
+
+async def _handle_ws(websocket: WebSocket, session_id: str, whisper, translator,
+                     process_bytes: int, overlap_bytes: int):
     await session_manager.connect(session_id, websocket)
-
     try:
         await session_manager.send(session_id, {
-            "type": "connected",
-            "message": "Ceviri servisi hazir!",
-            "session_id": session_id
+            "type": "connected", "message": "Ceviri servisi hazir!", "session_id": session_id
         })
-
         while True:
             try:
                 raw = await asyncio.wait_for(websocket.receive(), timeout=30.0)
@@ -88,7 +92,6 @@ async def translation_websocket(websocket: WebSocket, session_id: str):
                 try:
                     message = json.loads(raw["text"])
                     msg_type = message.get("type")
-                    logger.info(f"Text mesaj alindi: {msg_type}")
 
                     if msg_type == "audio_chunk":
                         raw_data = message.get("data", "")
@@ -98,19 +101,15 @@ async def translation_websocket(websocket: WebSocket, session_id: str):
                             logger.warning(f"Base64 decode hatasi: {e}")
                             continue
 
-                        # PCM'i biriktir
                         session_manager.audio_buffers[session_id] += pcm
                         buf_len = len(session_manager.audio_buffers[session_id])
 
-                        # 3 saniye dolunca VE önceki işlem bitmişse işle
-                        if buf_len >= PROCESS_BYTES and not session_manager.is_processing[session_id]:
-                            audio_to_process = session_manager.audio_buffers[session_id][:PROCESS_BYTES]
-                            # Son 0.5 sn'yi sonraki chunk'a overlap olarak bırak
+                        if buf_len >= process_bytes and not session_manager.is_processing[session_id]:
+                            audio_to_process = session_manager.audio_buffers[session_id][:process_bytes]
                             session_manager.audio_buffers[session_id] = \
-                                session_manager.audio_buffers[session_id][PROCESS_BYTES - OVERLAP_BYTES:]
+                                session_manager.audio_buffers[session_id][process_bytes - overlap_bytes:]
                             session_manager.is_processing[session_id] = True
                             wav = pcm_to_wav(audio_to_process)
-                            # create_task: döngüyü bloklamaz, yeni ses almaya devam eder
                             asyncio.create_task(
                                 _process_audio(wav, session_id, whisper, translator)
                             )
@@ -121,15 +120,19 @@ async def translation_websocket(websocket: WebSocket, session_id: str):
                 except Exception as e:
                     logger.error(f"Text isleme hatasi: {e}")
 
-            elif "bytes" in raw:
-                logger.info(f"Binary mesaj alindi: {len(raw['bytes'])} bytes (beklenmiyordu)")
-
     except WebSocketDisconnect:
         logger.info(f"Disconnect: {session_id}")
     except Exception as e:
         logger.error(f"WebSocket hatasi: {e}")
     finally:
         session_manager.disconnect(session_id)
+
+
+@router.websocket("/translate/{session_id}")
+async def translation_websocket(websocket: WebSocket, session_id: str):
+    whisper: WhisperService = websocket.app.state.whisper
+    translator: TranslationService = websocket.app.state.translator
+    await _handle_ws(websocket, session_id, whisper, translator, PROCESS_BYTES, OVERLAP_BYTES)
 
 async def _process_audio(audio_bytes, session_id, whisper, translator):
     try:

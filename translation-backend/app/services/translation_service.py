@@ -80,6 +80,20 @@ class TranslationService:
         if source_language.lower() in SKIP_LANGUAGES:
             return {"translated": text, "source_language": "tr", "provider": "none"}
 
+        # Google Translate ücretsiz API ~5000 karakter limiti var
+        # Çok uzun metni son cümleyi bulmaya çalışarak kes
+        MAX_CHARS = 3000
+        if len(text) > MAX_CHARS:
+            truncated = text[:MAX_CHARS]
+            last_punct = max(
+                truncated.rfind(". "),
+                truncated.rfind("? "),
+                truncated.rfind("! "),
+                truncated.rfind("\n"),
+            )
+            text = truncated[:last_punct + 1].strip() if last_punct > MAX_CHARS // 2 else truncated.strip()
+            logger.info(f"Metin kısaltıldı: {len(text)} karakter")
+
         try:
             if self.deepl_api_key:
                 result = await self._translate_deepl(text, source_language)
