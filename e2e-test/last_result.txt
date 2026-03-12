@@ -1,0 +1,42 @@
+Toplam 65 transkript satiri bulundu.
+Auto-detect T_video_start: 09:05:01.62
+
+========================================================================
+  VTT Phrase                           V.Time   Log Time     E2E
+------------------------------------------------------------------------
+  Global temperatures in 2025         T+  0.3s 09:05:03.97   2.87s ██
+  slightly lower than 2024            T+  2.3s 09:05:05.52   2.42s ██
+  makes it the third hottest year     T+  4.6s 09:05:08.18   2.78s ██
+  record across the globe             T+  7.0s 09:05:09.65   1.84s █
+  Met Office and European climate     T+  9.5s 09:05:13.35   3.05s ███
+  scientists also found               T+ 11.3s 09:05:13.35   1.25s █
+  year in a row in which temperatures T+ 13.2s 09:05:15.39   1.39s █
+  reached more than 1.4 degrees       T+ 15.2s 09:05:17.96   1.95s █
+  pre-industrial levels               T+ 18.4s 09:05:21.12   1.92s █
+  Dr Samantha Burgess                 T+ 20.8s 09:05:23.63   2.02s ██
+  key findings from this              T+ 28.3s 09:05:31.59   2.49s ██
+  year's report                       T+ 30.5s 09:05:33.74   2.44s ██
+  third warmest year on record after 24 T+ 33.0s 09:05:35.78   1.97s █
+  on record after 24 and 2023         T+ 35.5s 09:05:37.26   0.95s 
+  three years above 1.5 degrees       T+ 52.0s 09:05:53.34   0.54s 
+  ten years on from the Paris agreement T+ 55.0s 09:05:57.64   1.83s █
+  every nation committed              T+ 58.0s 09:05:59.71   0.90s 
+  slowed down on trying to mitigate   T+ 72.0s 09:06:15.23   2.43s ██
+  political rhetoric                  T+ 75.0s 09:06:21.28   5.48s █████
+  science is unequivocal              T+ 80.0s 09:06:27.79   6.99s ██████
+  evidence is incredibly clear        T+ 83.0s 09:06:31.35   7.54s ███████
+  all come out and said the same thing T+ 90.0s 09:06:35.63   4.83s ████
+  we know what to do                  T+ 95.0s 09:06:41.34   5.54s █████
+  success stories                     T+100.0s 09:06:45.43   4.62s ████
+  transition to renewable energy      T+105.0s 09:06:47.44   1.64s █
+========================================================================
+  Eslesen: 46/51 phrase
+  Gecerli olcum: 25
+  Ortalama E2E:  2.87s
+  Min E2E:       0.54s
+  Max E2E:       7.54s
+
+  PHANTOM: Yok! Yeni threshold calisiyor.
+
+  SONUC:
+    ✅ E2E ortalama 2.9s - BASARILI
