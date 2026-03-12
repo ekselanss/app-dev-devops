@@ -15,17 +15,17 @@ services:
     environment:
       - DEEPL_API_KEY=${DEEPL_API_KEY:-}
       - LOG_LEVEL=info
-      - WHISPER_MODEL=small
+      - WHISPER_MODEL=base
       - WORKERS=1
     volumes:
       - whisper-cache:/root/.cache/huggingface
     deploy:
       resources:
         limits:
-          cpus: "2.0"
+          cpus: "6.0"
           memory: 4G
         reservations:
-          cpus: "0.5"
+          cpus: "1.0"
           memory: 1G
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]

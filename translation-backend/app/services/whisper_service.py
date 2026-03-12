@@ -1,4 +1,5 @@
 import io
+import os
 import logging
 import numpy as np
 import soundfile as sf
@@ -24,7 +25,14 @@ class WhisperService:
     async def load_model(self):
         from faster_whisper import WhisperModel
         logger.info(f"faster-whisper '{self.model_name}' yukleniyor (CPU int8)...")
-        self.model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
+        cpu_threads = int(os.environ.get("CPU_THREADS", "6"))
+        self.model = WhisperModel(
+            self.model_name,
+            device="cpu",
+            compute_type="int8",
+            cpu_threads=cpu_threads,
+            num_workers=2,  # paralel decode worker
+        )
         logger.info("faster-whisper hazir")
 
     def transcribe(self, audio_bytes: bytes) -> dict:
@@ -53,7 +61,7 @@ class WhisperService:
                 language=self._locked_language,
                 temperature=0.0,
                 best_of=1,
-                beam_size=3,
+                beam_size=1,
                 condition_on_previous_text=False,
                 initial_prompt=None,
                 compression_ratio_threshold=2.4,

@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup: modelleri yükle
     logger.info("🚀 Sunucu başlatılıyor...")
-    app.state.whisper = WhisperService(model_name="small")
+    model_name = os.environ.get("WHISPER_MODEL", "base")
+    app.state.whisper = WhisperService(model_name=model_name)
     app.state.translator = TranslationService()
     await app.state.whisper.load_model()
     # Hızlı mod da aynı modeli kullanır — 1sn chunk boyutu gecikmeyi 3x azaltır
