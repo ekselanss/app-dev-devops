@@ -69,14 +69,27 @@ class WebSocketService {
     this.statusHandler?.('disconnected');
   }
 
-  sendAudioChunk(rawData: string) {
+  sendAudioChunk(rawData: string, targetLanguage?: string) {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
+      const msg: any = {
         type: 'audio_chunk',
         data: rawData,
         sample_rate: 16000,
-      }));
+      };
+      if (targetLanguage) {
+        msg.target_language = targetLanguage;
+      }
+      this.ws.send(JSON.stringify(msg));
       console.log('JSON GONDERILDI boyut:', rawData.length);
+    }
+  }
+
+  setTargetLanguage(language: string) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        type: 'set_target_language',
+        language,
+      }));
     }
   }
 

@@ -6,8 +6,22 @@ from collections import deque
 
 logger = logging.getLogger(__name__)
 
-# Türkçeye çevrilmesine gerek olmayan diller
-SKIP_LANGUAGES = {"tr", "turkish"}
+# Hedef dil kodları (client'tan gelen kısa kod → DeepL/Google kodu)
+TARGET_LANGUAGE_MAP = {
+    "tr": {"deepl": "TR", "google": "tr", "name": "Türkçe"},
+    "en": {"deepl": "EN", "google": "en", "name": "English"},
+    "de": {"deepl": "DE", "google": "de", "name": "Deutsch"},
+    "fr": {"deepl": "FR", "google": "fr", "name": "Français"},
+    "es": {"deepl": "ES", "google": "es", "name": "Español"},
+    "it": {"deepl": "IT", "google": "it", "name": "Italiano"},
+    "pt": {"deepl": "PT-PT", "google": "pt", "name": "Português"},
+    "ru": {"deepl": "RU", "google": "ru", "name": "Русский"},
+    "ja": {"deepl": "JA", "google": "ja", "name": "日本語"},
+    "ko": {"deepl": "KO", "google": "ko", "name": "한국어"},
+    "zh": {"deepl": "ZH", "google": "zh", "name": "中文"},
+    "ar": {"deepl": "AR", "google": "ar", "name": "العربية"},
+    "nl": {"deepl": "NL", "google": "nl", "name": "Nederlands"},
+}
 
 # DeepL dil kodları eşlemesi (Whisper → DeepL)
 LANGUAGE_MAP = {
@@ -58,17 +72,18 @@ class TranslationService:
         else:
             logger.warning("⚠️ DeepL API anahtarı yok, Google Translate kullanılacak")
 
-    async def translate(self, text: str, source_language: str) -> dict:
+    async def translate(self, text: str, source_language: str, target_language: str = "tr") -> dict:
         """
-        Metni Türkçeye çevir.
-        
+        Metni hedef dile çevir.
+
         Args:
             text: Çevrilecek metin
             source_language: Kaynak dil kodu (Whisper formatında, örn: "en")
-            
+            target_language: Hedef dil kodu (örn: "tr", "en", "de")
+
         Returns:
             {
-                "translated": "Türkçe metin...",
+                "translated": "Çevrilmiş metin...",
                 "source_language": "en",
                 "provider": "deepl"
             }
@@ -76,9 +91,9 @@ class TranslationService:
         if not text or not text.strip():
             return {"translated": "", "source_language": source_language, "provider": "none"}
 
-        # Zaten Türkçeyse çevirme
-        if source_language.lower() in SKIP_LANGUAGES:
-            return {"translated": text, "source_language": "tr", "provider": "none"}
+        # Kaynak ve hedef aynı dil ise çevirme
+        if source_language.lower() == target_language.lower():
+            return {"translated": text, "source_language": source_language, "provider": "none"}
 
         # Google Translate ücretsiz API ~5000 karakter limiti var
         # Çok uzun metni son cümleyi bulmaya çalışarak kes
@@ -96,9 +111,9 @@ class TranslationService:
 
         try:
             if self.deepl_api_key:
-                result = await self._translate_deepl(text, source_language)
+                result = await self._translate_deepl(text, source_language, target_language)
             else:
-                result = await self._translate_google(text, source_language)
+                result = await self._translate_google(text, source_language, target_language)
 
             # Bağlam tamponuna ekle
             self.context_buffer.append({
@@ -116,9 +131,11 @@ class TranslationService:
                 "provider": "error"
             }
 
-    async def _translate_deepl(self, text: str, source_language: str) -> dict:
+    async def _translate_deepl(self, text: str, source_language: str, target_language: str = "tr") -> dict:
         """DeepL API ile çeviri"""
         source_lang_deepl = LANGUAGE_MAP.get(source_language.lower(), source_language.upper())
+        target_info = TARGET_LANGUAGE_MAP.get(target_language, {"deepl": target_language.upper()})
+        target_lang_deepl = target_info["deepl"]
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
@@ -130,7 +147,7 @@ class TranslationService:
                 json={
                     "text": [text],
                     "source_lang": source_lang_deepl,
-                    "target_lang": "TR",
+                    "target_lang": target_lang_deepl,
                     "formality": "default",
                     "tag_handling": "off"
                 }
@@ -139,25 +156,28 @@ class TranslationService:
             data = response.json()
             translated = data["translations"][0]["text"]
 
-            logger.info(f"🌐 DeepL [{source_language}→TR]: {translated[:60]}...")
+            logger.info(f"🌐 DeepL [{source_language}→{target_language.upper()}]: {translated[:60]}...")
             return {
                 "translated": translated,
                 "source_language": source_language,
                 "provider": "deepl"
             }
 
-    async def _translate_google(self, text: str, source_language: str) -> dict:
+    async def _translate_google(self, text: str, source_language: str, target_language: str = "tr") -> dict:
         """
         Google Translate (ücretsiz, resmi olmayan endpoint).
         Production'da Google Cloud Translation API kullan.
         """
+        target_info = TARGET_LANGUAGE_MAP.get(target_language, {"google": target_language})
+        tl = target_info["google"]
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
                 "https://translate.googleapis.com/translate_a/single",
                 params={
                     "client": "gtx",
                     "sl": source_language,
-                    "tl": "tr",
+                    "tl": tl,
                     "dt": "t",
                     "q": text
                 }
@@ -172,7 +192,7 @@ class TranslationService:
                     translated_parts.append(item[0])
             translated = "".join(translated_parts)
 
-            logger.info(f"🌐 Google [{source_language}→TR]: {translated[:60]}...")
+            logger.info(f"🌐 Google [{source_language}→{target_language.upper()}]: {translated[:60]}...")
             return {
                 "translated": translated,
                 "source_language": source_language,

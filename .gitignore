@@ -8,6 +8,7 @@ translation-backend/*.pyc
 translation-backend/transcripts.jsonl
 translation-backend/test_audio.wav
 translation-backend/.env
+translation-backend/.venv/
 
 # Node / React Native
 VideoTranslatorApp/node_modules/
@@ -45,3 +46,12 @@ src_files/
 analyze.py
 get_transcript.py
 compare_transcript.py
+
+# Benchmark test artifacts
+e2e-test/bbc_test_16k*.wav
+e2e-test/benchmark_*.json
+e2e-test/last_*.txt
+e2e-test/last_*.log
+
+# APK releases
+*.apk

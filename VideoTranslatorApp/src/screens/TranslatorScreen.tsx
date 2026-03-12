@@ -39,6 +39,22 @@ import { loadServerUrl, saveServerUrl, getServerUrl } from '../utils/serverConfi
 const OverlayNative = NativeModules.OverlayService;
 const ForegroundService = NativeModules.ForegroundService;
 
+const TARGET_LANGUAGES = [
+  { code: 'tr', label: '🇹🇷 Türkçe' },
+  { code: 'en', label: '🇬🇧 English' },
+  { code: 'de', label: '🇩🇪 Deutsch' },
+  { code: 'fr', label: '🇫🇷 Français' },
+  { code: 'es', label: '🇪🇸 Español' },
+  { code: 'it', label: '🇮🇹 Italiano' },
+  { code: 'pt', label: '🇵🇹 Português' },
+  { code: 'ru', label: '🇷🇺 Русский' },
+  { code: 'ar', label: '🇸🇦 العربية' },
+  { code: 'ja', label: '🇯🇵 日本語' },
+  { code: 'ko', label: '🇰🇷 한국어' },
+  { code: 'zh', label: '🇨🇳 中文' },
+  { code: 'nl', label: '🇳🇱 Nederlands' },
+];
+
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 interface TranslationState {
@@ -65,6 +81,8 @@ export function TranslatorScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [serverUrl, setServerUrl] = useState('');
   const [serverUrlInput, setServerUrlInput] = useState('');
+  const [targetLanguage, setTargetLanguage] = useState('tr');
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
 
   const { history, addEntry, deleteEntry, clearAll } = useTranslationHistory();
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -137,8 +155,11 @@ export function TranslatorScreen() {
     }
   }, []);
 
+  const targetLangRef = useRef(targetLanguage);
+  useEffect(() => { targetLangRef.current = targetLanguage; }, [targetLanguage]);
+
   const { startRecording, stopRecording } = useAudioRecorder({
-    onChunkReady: (b64) => wsService.sendAudioChunk(b64),
+    onChunkReady: (b64) => wsService.sendAudioChunk(b64, targetLangRef.current),
     onError: (e) => console.error('Kayıt hatası:', e),
   });
 
@@ -231,13 +252,20 @@ export function TranslatorScreen() {
           </View>
         </View>
 
-        {/* Mod etiketi */}
+        {/* Mod etiketi + Dil seçici */}
         <View style={styles.modeBadgeRow}>
           <View style={styles.modeBadge}>
             <Text style={styles.modeBadgeText}>
               {useSpeechMode ? '🎙 Konuşma Tanıma' : '🎤 Mikrofon → Whisper AI'}
             </Text>
           </View>
+          <TouchableOpacity
+            style={styles.langBadge}
+            onPress={() => setShowLanguagePicker(true)}>
+            <Text style={styles.langBadgeText}>
+              → {TARGET_LANGUAGES.find(l => l.code === targetLanguage)?.label || targetLanguage}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Orta Alan */}
@@ -303,6 +331,40 @@ export function TranslatorScreen() {
           />
         )}
 
+        {/* Dil Seçici Modalı */}
+        <Modal visible={showLanguagePicker} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Çeviri Dili</Text>
+              <View style={styles.langGrid}>
+                {TARGET_LANGUAGES.map(lang => (
+                  <TouchableOpacity
+                    key={lang.code}
+                    style={[
+                      styles.langOption,
+                      targetLanguage === lang.code && styles.langOptionActive,
+                    ]}
+                    onPress={() => {
+                      setTargetLanguage(lang.code);
+                      wsService.setTargetLanguage(lang.code);
+                      setShowLanguagePicker(false);
+                    }}>
+                    <Text style={[
+                      styles.langOptionText,
+                      targetLanguage === lang.code && styles.langOptionTextActive,
+                    ]}>{lang.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity
+                style={styles.modalBtnCancel}
+                onPress={() => setShowLanguagePicker(false)}>
+                <Text style={styles.modalBtnText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {/* Sunucu Ayarları Modalı */}
         <Modal visible={showSettings} transparent animationType="fade">
           <View style={styles.modalOverlay}>
@@ -362,9 +424,16 @@ const styles = StyleSheet.create({
   settingsBtnText: { fontSize: 18 },
   historyBtn: { padding: 6 },
   historyBtnText: { fontSize: 18, color: '#888' },
-  modeBadgeRow: { alignItems: 'center', marginBottom: 4 },
+  modeBadgeRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' },
   modeBadge: { backgroundColor: '#1a1a2e', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4, borderWidth: 1, borderColor: '#333' },
   modeBadgeText: { color: '#888', fontSize: 12, fontWeight: '600' },
+  langBadge: { backgroundColor: '#1a2e1a', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4, borderWidth: 1, borderColor: '#4CAF50' },
+  langBadgeText: { color: '#4CAF50', fontSize: 12, fontWeight: '600' },
+  langGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16, justifyContent: 'center' },
+  langOption: { backgroundColor: '#0a0a0a', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#333' },
+  langOptionActive: { borderColor: '#4CAF50', backgroundColor: '#1a2e1a' },
+  langOptionText: { color: '#888', fontSize: 13 },
+  langOptionTextActive: { color: '#4CAF50', fontWeight: '600' },
   centerArea: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   instructionBox: { alignItems: 'center', gap: 12 },
   instructionIcon: { fontSize: 48, marginBottom: 4 },

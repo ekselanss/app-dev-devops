@@ -15,31 +15,34 @@ TRANSCRIPT_LOG = Path(__file__).parent.parent.parent / "transcripts.jsonl"
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Normal mod: 3 saniye @ 16kHz 16-bit mono = 96000 byte
-PROCESS_BYTES = 16000 * 2 * 3
-OVERLAP_BYTES = int(16000 * 2 * 1.0)
+# Normal mod: 5 saniye @ 16kHz 16-bit mono — small model daha fazla bağlam ister
+PROCESS_BYTES = 16000 * 2 * 5
+OVERLAP_BYTES = int(16000 * 2 * 1.5)
 
-# Hızlı mod: 1 saniye chunk — Whisper tiny ile ~1-1.5s gecikme
-PROCESS_BYTES_FAST = 16000 * 2 * 1
-OVERLAP_BYTES_FAST = int(16000 * 2 * 0.2)
+# Hızlı mod: 2 saniye chunk — small modelde hız/kalite dengesi
+PROCESS_BYTES_FAST = 16000 * 2 * 2
+OVERLAP_BYTES_FAST = int(16000 * 2 * 0.3)
 
 class SessionManager:
     def __init__(self):
         self.active_sessions: dict[str, WebSocket] = {}
         self.audio_buffers: dict[str, bytes] = {}   # ham PCM biriktiricisi
         self.is_processing: dict[str, bool] = {}    # işlem kilidi (CPU'yu korur)
+        self.target_languages: dict[str, str] = {}  # hedef dil (varsayılan: tr)
 
     async def connect(self, session_id: str, websocket: WebSocket):
         await websocket.accept()
         self.active_sessions[session_id] = websocket
         self.audio_buffers[session_id] = b""
         self.is_processing[session_id] = False
+        self.target_languages[session_id] = "tr"
         logger.info(f"Yeni baglanti: {session_id}")
 
     def disconnect(self, session_id: str):
         self.active_sessions.pop(session_id, None)
         self.audio_buffers.pop(session_id, None)
         self.is_processing.pop(session_id, None)
+        self.target_languages.pop(session_id, None)
         logger.info(f"Baglanti kesildi: {session_id}")
 
     async def send(self, session_id: str, message: dict):
@@ -94,6 +97,11 @@ async def _handle_ws(websocket: WebSocket, session_id: str, whisper, translator,
                     msg_type = message.get("type")
 
                     if msg_type == "audio_chunk":
+                        # Client hedef dil gönderebilir
+                        target = message.get("target_language")
+                        if target:
+                            session_manager.target_languages[session_id] = target
+
                         raw_data = message.get("data", "")
                         try:
                             pcm = base64.b64decode(raw_data)
@@ -110,9 +118,18 @@ async def _handle_ws(websocket: WebSocket, session_id: str, whisper, translator,
                                 session_manager.audio_buffers[session_id][process_bytes - overlap_bytes:]
                             session_manager.is_processing[session_id] = True
                             wav = pcm_to_wav(audio_to_process)
+                            tgt = session_manager.target_languages.get(session_id, "tr")
                             asyncio.create_task(
-                                _process_audio(wav, session_id, whisper, translator)
+                                _process_audio(wav, session_id, whisper, translator, tgt)
                             )
+
+                    elif msg_type == "set_target_language":
+                        tgt = message.get("language", "tr")
+                        session_manager.target_languages[session_id] = tgt
+                        logger.info(f"Hedef dil değişti: {tgt} (session={session_id})")
+                        await session_manager.send(session_id, {
+                            "type": "language_changed", "target_language": tgt
+                        })
 
                     elif msg_type == "ping":
                         await session_manager.send(session_id, {"type": "pong"})
@@ -134,7 +151,7 @@ async def translation_websocket(websocket: WebSocket, session_id: str):
     translator: TranslationService = websocket.app.state.translator
     await _handle_ws(websocket, session_id, whisper, translator, PROCESS_BYTES, OVERLAP_BYTES)
 
-async def _process_audio(audio_bytes, session_id, whisper, translator):
+async def _process_audio(audio_bytes, session_id, whisper, translator, target_language="tr"):
     try:
         await session_manager.send(session_id, {"type": "processing"})
         logger.info(f"Ses isleniyor: {len(audio_bytes)} bytes")
@@ -150,7 +167,7 @@ async def _process_audio(audio_bytes, session_id, whisper, translator):
             await session_manager.send(session_id, {"type": "empty"})
             return
 
-        translation = await translator.translate(text, language)
+        translation = await translator.translate(text, language, target_language)
 
         result = {
             "type": "translation",

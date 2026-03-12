@@ -11,6 +11,7 @@ router = APIRouter()
 class TranslateRequest(BaseModel):
     text: str
     source_language: str = "auto"   # "en", "de", "fr", "auto" ...
+    target_language: str = "tr"     # hedef dil
     session_id: str = ""
 
 
@@ -30,7 +31,7 @@ async def translate_text(body: TranslateRequest, request: Request):
         raise HTTPException(400, "Metin boş olamaz")
 
     translator = request.app.state.translator
-    result = await translator.translate(body.text, body.source_language)
+    result = await translator.translate(body.text, body.source_language, body.target_language)
 
     return TranslateResponse(
         translated=result["translated"],

@@ -15,7 +15,8 @@ services:
     environment:
       - DEEPL_API_KEY=${DEEPL_API_KEY:-}
       - LOG_LEVEL=info
-      - WHISPER_MODEL=base
+      - WHISPER_MODEL=small
+      - CPU_THREADS=8
       - WORKERS=1
       - TZ=Europe/Istanbul
     volumes:
@@ -23,11 +24,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "6.0"
-          memory: 4G
+          cpus: "8.0"
+          memory: 8G
         reservations:
-          cpus: "1.0"
-          memory: 1G
+          cpus: "4.0"
+          memory: 2G
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s

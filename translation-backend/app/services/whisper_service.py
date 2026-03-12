@@ -17,23 +17,36 @@ class WhisperService:
         self.model_name = model_name
         self.model = None
         self.device = "cpu"
-        # Dil kilidi: İngilizce kilitli başla (TRT World, YouTube EN içerik)
-        # 5+ farklı dil tespiti gelirse kilit kırılır
-        self._locked_language: str | None = "en"
-        self._lock_votes: int = 5
+        # Dil kilidi: otomatik tespitle başla, 3 ardışık aynı dil tespitinde kilitlenir
+        self._locked_language: str | None = None
+        self._lock_votes: int = 0
+        self._chunk_counter: int = 0  # Her N chunk'ta dil tespiti zorla
 
     async def load_model(self):
         from faster_whisper import WhisperModel
-        logger.info(f"faster-whisper '{self.model_name}' yukleniyor (CPU int8)...")
-        cpu_threads = int(os.environ.get("CPU_THREADS", "6"))
+        import platform
+
+        cpu_threads = int(os.environ.get("CPU_THREADS", "0"))
+        if cpu_threads <= 0:
+            cpu_threads = min(os.cpu_count() or 4, 16)
+
+        # Apple Silicon icin optimize: int8 M1/M2/M3/M4'te cok hizli
+        compute = "int8"
+        logger.info(
+            f"faster-whisper '{self.model_name}' yukleniyor "
+            f"(CPU {compute}, {cpu_threads} thread, {platform.machine()})..."
+        )
         self.model = WhisperModel(
             self.model_name,
             device="cpu",
-            compute_type="int8",
+            compute_type=compute,
             cpu_threads=cpu_threads,
-            num_workers=2,  # paralel decode worker
+            num_workers=2,
         )
-        logger.info("faster-whisper hazir")
+        logger.info(
+            f"faster-whisper hazir — model={self.model_name} "
+            f"threads={cpu_threads} arch={platform.machine()}"
+        )
 
     def transcribe(self, audio_bytes: bytes) -> dict:
         if self.model is None:
@@ -55,10 +68,15 @@ class WhisperService:
                 logger.info("Ses çok sessiz, atlandı")
                 return {"text": "", "language": "unknown", "confidence": 0.0}
 
+            # Her 3 chunk'ta bir dil tespiti yap (kilitli olsa bile)
+            self._chunk_counter += 1
+            is_detection_chunk = (self._chunk_counter % 3 == 0)
+            use_language = None if is_detection_chunk else self._locked_language
+
             segments, info = self.model.transcribe(
                 audio_array,
                 task="transcribe",
-                language=self._locked_language,
+                language=use_language,
                 temperature=0.0,
                 best_of=1,
                 beam_size=1,
@@ -78,6 +96,16 @@ class WhisperService:
 
             segments = list(segments)
             text = " ".join(s.text for s in segments).strip()
+
+            # Dil tespiti chunk'ında farklı dil gelirse anında geç
+            if is_detection_chunk and info.language != self._locked_language and info.language_probability > 0.70:
+                logger.info(f"Dil tespiti: {info.language} ({info.language_probability:.0%}) — kilitli: {self._locked_language}")
+                self._locked_language = info.language
+                self._lock_votes = 2
+                logger.info(f"Dil anında değişti → {info.language}")
+                # Yanlış dilde çözülen metni at, bir sonraki chunk doğru dilde gelecek
+                if text and self._locked_language != use_language:
+                    return {"text": "", "language": info.language, "confidence": round(info.language_probability, 2)}
             language = info.language
             confidence = round(max(0.0, min(1.0, info.language_probability)), 2)
 
@@ -104,22 +132,18 @@ class WhisperService:
         return audio
 
     def _update_language_lock(self, language: str, confidence: float):
-        """3 ardışık yüksek-güven tespitte dili kilitle, farklı dil gelince kilidi sıfırla."""
-        if confidence < 0.75:
+        """Aynı dil gelince vote artır, farklı dil gelince hızla düşür."""
+        if confidence < 0.70:
             return
         if language == self._locked_language:
-            self._lock_votes = min(self._lock_votes + 1, 10)
+            self._lock_votes = min(self._lock_votes + 1, 5)
         else:
-            if self._lock_votes <= 2:
-                # Henüz kilitlenmemiş, yeni dile geç
+            # Farklı dil — vote'u hızla düşür
+            self._lock_votes -= 1
+            if self._lock_votes <= 0:
                 self._locked_language = language
                 self._lock_votes = 1
-            else:
-                # Kilitli dili değiştirmek için 3 ardışık farklı tespit gerekir
-                self._lock_votes -= 1
-                if self._lock_votes == 0:
-                    self._locked_language = language
-                    self._lock_votes = 1
+                logger.info(f"Dil değişti → {language} (confidence={confidence:.0%})")
 
     def _is_hallucination(self, text: str) -> bool:
         """Tekrar eden kelime/ifade döngüsü tespiti."""
