@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import websocket, health, benchmark, translate
 from app.services.whisper_service import WhisperService
 from app.services.translation_service import TranslationService
+from app.services.vad_service import VadService
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,6 +26,9 @@ async def lifespan(app: FastAPI):
     # Hızlı mod da aynı modeli kullanır — 1sn chunk boyutu gecikmeyi 3x azaltır
     app.state.whisper_fast = app.state.whisper
     logger.info("✅ Whisper modeli yüklendi (normal + hızlı mod)")
+    app.state.vad = VadService()
+    app.state.vad.load_model()
+    logger.info("✅ Silero VAD modeli yüklendi")
     logger.info("✅ Çeviri servisi hazır")
     yield
     # Shutdown

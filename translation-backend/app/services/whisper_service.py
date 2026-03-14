@@ -30,22 +30,34 @@ class WhisperService:
         if cpu_threads <= 0:
             cpu_threads = min(os.cpu_count() or 4, 16)
 
-        # Apple Silicon icin optimize: int8 M1/M2/M3/M4'te cok hizli
+        # GPU auto-detect: CUDA varsa float16, yoksa CPU int8
+        device = "cpu"
         compute = "int8"
+        try:
+            import ctranslate2
+            if "cuda" in ctranslate2.get_supported_compute_types("cuda"):
+                device = "cuda"
+                compute = "float16"
+                logger.info("CUDA GPU algilandi — GPU modunda calisilacak")
+        except Exception:
+            pass
+
+        self.device = device
+
         logger.info(
             f"faster-whisper '{self.model_name}' yukleniyor "
-            f"(CPU {compute}, {cpu_threads} thread, {platform.machine()})..."
+            f"({device} {compute}, {cpu_threads} thread, {platform.machine()})..."
         )
         self.model = WhisperModel(
             self.model_name,
-            device="cpu",
+            device=device,
             compute_type=compute,
-            cpu_threads=cpu_threads,
+            cpu_threads=cpu_threads if device == "cpu" else 1,
             num_workers=2,
         )
         logger.info(
             f"faster-whisper hazir — model={self.model_name} "
-            f"threads={cpu_threads} arch={platform.machine()}"
+            f"device={device} compute={compute}"
         )
 
     def transcribe(self, audio_bytes: bytes) -> dict:
@@ -55,7 +67,7 @@ class WhisperService:
         try:
             audio_array = self._bytes_to_numpy(audio_bytes)
 
-            if len(audio_array) < 16000 * 0.5:
+            if len(audio_array) < 16000 * 0.3:
                 return {"text": "", "language": "unknown", "confidence": 0.0}
 
             # Ses normalizasyonu: hoparlör→mikrofon yolu tutarsız seviye üretir
@@ -85,13 +97,7 @@ class WhisperService:
                 compression_ratio_threshold=2.4,
                 no_speech_threshold=0.45,
                 log_prob_threshold=-1.0,
-                vad_filter=True,
-                vad_parameters={
-                    "threshold": 0.5,
-                    "min_speech_duration_ms": 200,
-                    "min_silence_duration_ms": 400,
-                    "speech_pad_ms": 200,
-                },
+                vad_filter=False,
             )
 
             segments = list(segments)
