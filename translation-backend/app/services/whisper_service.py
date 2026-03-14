@@ -35,10 +35,11 @@ class WhisperService:
         compute = "int8"
         try:
             import ctranslate2
-            if "cuda" in ctranslate2.get_supported_compute_types("cuda"):
+            cuda_types = ctranslate2.get_supported_compute_types("cuda")
+            if cuda_types:
                 device = "cuda"
                 compute = "float16"
-                logger.info("CUDA GPU algilandi — GPU modunda calisilacak")
+                logger.info(f"CUDA GPU algilandi — GPU modunda calisilacak (types: {cuda_types})")
         except Exception:
             pass
 
