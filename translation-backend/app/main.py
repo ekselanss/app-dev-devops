@@ -19,13 +19,27 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup: modelleri yükle
     logger.info("🚀 Sunucu başlatılıyor...")
-    model_name = os.environ.get("WHISPER_MODEL", "base")
-    app.state.whisper = WhisperService(model_name=model_name)
+
+    # Tier sistemi: free=small, pro=large-v3
+    free_model = os.environ.get("WHISPER_MODEL_FREE", "small")
+    pro_model = os.environ.get("WHISPER_MODEL_PRO", "large-v3")
+
+    # Free model (varsayılan)
+    app.state.whisper = WhisperService(model_name=free_model)
     app.state.translator = TranslationService()
     await app.state.whisper.load_model()
-    # Hızlı mod da aynı modeli kullanır — 1sn chunk boyutu gecikmeyi 3x azaltır
     app.state.whisper_fast = app.state.whisper
-    logger.info("✅ Whisper modeli yüklendi (normal + hızlı mod)")
+    logger.info(f"✅ Free model yüklendi: {free_model}")
+
+    # Pro model (ayrı instance)
+    if pro_model != free_model:
+        app.state.whisper_pro = WhisperService(model_name=pro_model)
+        await app.state.whisper_pro.load_model()
+        logger.info(f"✅ Pro model yüklendi: {pro_model}")
+    else:
+        app.state.whisper_pro = app.state.whisper
+        logger.info("✅ Pro model = Free model (aynı)")
+
     app.state.vad = VadService()
     app.state.vad.load_model()
     logger.info("✅ Silero VAD modeli yüklendi")

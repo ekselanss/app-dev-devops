@@ -10,6 +10,8 @@ type Status = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 interface ConnectionStatusBarProps {
   status: Status;
+  tier?: string;
+  model?: string;
 }
 
 const STATUS_CONFIG: Record<Status, { label: string; color: string; icon: string }> = {
@@ -19,7 +21,7 @@ const STATUS_CONFIG: Record<Status, { label: string; color: string; icon: string
   error:      { label: 'Bağlantı Hatası', color: '#F44336', icon: '✕' },
 };
 
-export function ConnectionStatusBar({ status }: ConnectionStatusBarProps) {
+export function ConnectionStatusBar({ status, tier, model }: ConnectionStatusBarProps) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const config = STATUS_CONFIG[status] ?? STATUS_CONFIG['connecting'];
 
@@ -39,12 +41,14 @@ export function ConnectionStatusBar({ status }: ConnectionStatusBarProps) {
     }
   }, [status]);
 
+  const tierLabel = tier === 'pro' ? ' PRO' : '';
+
   return (
     <View style={[styles.container, { backgroundColor: config.color + '22' }]}>
       <Animated.Text style={[styles.icon, { color: config.color, opacity: pulseAnim }]}>
         {config.icon}
       </Animated.Text>
-      <Text style={[styles.label, { color: config.color }]}>{config.label}</Text>
+      <Text style={[styles.label, { color: config.color }]}>{config.label}{tierLabel}</Text>
     </View>
   );
 }

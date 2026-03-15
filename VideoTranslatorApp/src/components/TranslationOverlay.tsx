@@ -17,6 +17,7 @@ interface TranslationOverlayProps {
   translated: string;
   original: string;
   detectedLanguage: string;
+  targetLanguage: string;
   confidence: number;
   isProcessing: boolean;
   showOriginal: boolean;
@@ -27,6 +28,7 @@ export function TranslationOverlay({
   translated,
   original,
   detectedLanguage,
+  targetLanguage,
   confidence,
   isProcessing,
   showOriginal,
@@ -64,28 +66,40 @@ export function TranslationOverlay({
     }
   }, [translated]);
 
-  const LANG_LABELS: Record<string, string> = {
-    en: '🇬🇧 İngilizce',
-    es: '🇪🇸 İspanyolca',
-    fr: '🇫🇷 Fransızca',
-    de: '🇩🇪 Almanca',
-    ru: '🇷🇺 Rusça',
-    ja: '🇯🇵 Japonca',
-    ko: '🇰🇷 Korece',
-    zh: '🇨🇳 Çince',
-    ar: '🇸🇦 Arapça',
-    pt: '🇧🇷 Portekizce',
-    it: '🇮🇹 İtalyanca',
+  const LANG_FLAGS: Record<string, { flag: string; code: string }> = {
+    en: { flag: '🇬🇧', code: 'EN' },
+    es: { flag: '🇪🇸', code: 'ES' },
+    fr: { flag: '🇫🇷', code: 'FR' },
+    de: { flag: '🇩🇪', code: 'DE' },
+    ru: { flag: '🇷🇺', code: 'RU' },
+    ja: { flag: '🇯🇵', code: 'JA' },
+    ko: { flag: '🇰🇷', code: 'KO' },
+    zh: { flag: '🇨🇳', code: 'ZH' },
+    ar: { flag: '🇸🇦', code: 'AR' },
+    pt: { flag: '🇧🇷', code: 'PT' },
+    it: { flag: '🇮🇹', code: 'IT' },
+    tr: { flag: '🇹🇷', code: 'TR' },
+    nl: { flag: '🇳🇱', code: 'NL' },
+    hi: { flag: '🇮🇳', code: 'HI' },
+    ur: { flag: '🇵🇰', code: 'UR' },
+    fa: { flag: '🇮🇷', code: 'FA' },
   };
 
-  const langLabel = LANG_LABELS[detectedLanguage] ?? `🌐 ${detectedLanguage?.toUpperCase()}`;
+  const srcInfo = LANG_FLAGS[detectedLanguage] ?? { flag: '🌐', code: detectedLanguage?.toUpperCase() || '??' };
+  const tgtInfo = LANG_FLAGS[targetLanguage] ?? { flag: '🌐', code: targetLanguage?.toUpperCase() || 'TR' };
   const confidencePct = Math.round((confidence ?? 0) * 100);
 
   return (
     <View style={styles.container}>
-      {/* Üst bilgi çubuğu */}
+      {/* Sol üst: Kaynak → Hedef dil */}
       <View style={styles.infoBar}>
-        <Text style={styles.langLabel}>{langLabel}</Text>
+        <View style={styles.langBadge}>
+          <Text style={styles.langFlag}>{srcInfo.flag}</Text>
+          <Text style={styles.langCode}>{srcInfo.code}</Text>
+          <Text style={styles.langArrow}> → </Text>
+          <Text style={styles.langFlag}>{tgtInfo.flag}</Text>
+          <Text style={styles.langCode}>{tgtInfo.code}</Text>
+        </View>
         {confidence > 0 && (
           <Text style={styles.confidence}>%{confidencePct}</Text>
         )}
@@ -143,17 +157,40 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
-  langLabel: {
-    color: '#aaa',
-    fontSize: 11,
-    fontWeight: '500',
-    flex: 1,
+  langBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    gap: 4,
+    flex: 0,
+  },
+
+  langFlag: {
+    fontSize: 16,
+  },
+
+  langCode: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+
+  langArrow: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   confidence: {
     color: '#4CAF50',
     fontSize: 11,
     fontWeight: '600',
+    flex: 1,
+    marginLeft: 8,
   },
 
   toggleBtn: {

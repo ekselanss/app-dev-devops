@@ -17,10 +17,22 @@ class WhisperService:
         self.model_name = model_name
         self.model = None
         self.device = "cpu"
-        # Dil kilidi: otomatik tespitle başla, 3 ardışık aynı dil tespitinde kilitlenir
-        self._locked_language: str | None = None
-        self._lock_votes: int = 0
-        self._chunk_counter: int = 0  # Her N chunk'ta dil tespiti zorla
+        # Dil kilidi: session bazlı (her kullanıcının kendi dil kilidi)
+        self._session_locks: dict[str, dict] = {}
+
+    def _get_session_state(self, session_id: str) -> dict:
+        """Session bazlı dil kilidi state'i döndür."""
+        if session_id not in self._session_locks:
+            self._session_locks[session_id] = {
+                "locked_language": None,
+                "lock_votes": 0,
+                "chunk_counter": 0,
+            }
+        return self._session_locks[session_id]
+
+    def clear_session(self, session_id: str):
+        """Session kapandığında dil kilidini temizle."""
+        self._session_locks.pop(session_id, None)
 
     async def load_model(self):
         from faster_whisper import WhisperModel
@@ -61,7 +73,7 @@ class WhisperService:
             f"device={device} compute={compute}"
         )
 
-    def transcribe(self, audio_bytes: bytes) -> dict:
+    def transcribe(self, audio_bytes: bytes, session_id: str = "default") -> dict:
         if self.model is None:
             raise RuntimeError("Whisper modeli henuz yuklenmedi!")
 
@@ -77,14 +89,22 @@ class WhisperService:
             # Ses enerjisi log: sessizlik mi yoksa gerçek ses mi?
             rms = float(np.sqrt(np.mean(audio_array ** 2)))
             logger.info(f"Ses RMS: {rms:.4f}")
-            if rms < 0.02:
+            if rms < 0.03:
                 logger.info("Ses çok sessiz, atlandı")
                 return {"text": "", "language": "unknown", "confidence": 0.0}
 
+            # Session bazlı dil kilidi
+            state = self._get_session_state(session_id)
+
             # Her 3 chunk'ta bir dil tespiti yap (kilitli olsa bile)
-            self._chunk_counter += 1
-            is_detection_chunk = (self._chunk_counter % 3 == 0)
-            use_language = None if is_detection_chunk else self._locked_language
+            state["chunk_counter"] += 1
+            is_detection_chunk = (state["chunk_counter"] % 3 == 0)
+            use_language = None if is_detection_chunk else state["locked_language"]
+
+            # beam_size: model boyutuna göre ayarla
+            # small → beam=1 (hızlı, 50 user taşır)
+            # large-v3 → beam=3 (doğru, max 10-15 user)
+            use_beam = 3 if "large" in self.model_name else 1
 
             segments, info = self.model.transcribe(
                 audio_array,
@@ -92,11 +112,11 @@ class WhisperService:
                 language=use_language,
                 temperature=0.0,
                 best_of=1,
-                beam_size=1,
+                beam_size=use_beam,
                 condition_on_previous_text=False,
                 initial_prompt=None,
                 compression_ratio_threshold=2.4,
-                no_speech_threshold=0.45,
+                no_speech_threshold=0.50,
                 log_prob_threshold=-1.0,
                 vad_filter=False,
             )
@@ -105,26 +125,26 @@ class WhisperService:
             text = " ".join(s.text for s in segments).strip()
 
             # Dil tespiti chunk'ında farklı dil gelirse anında geç
-            if is_detection_chunk and info.language != self._locked_language and info.language_probability > 0.70:
-                logger.info(f"Dil tespiti: {info.language} ({info.language_probability:.0%}) — kilitli: {self._locked_language}")
-                self._locked_language = info.language
-                self._lock_votes = 2
-                logger.info(f"Dil anında değişti → {info.language}")
+            if is_detection_chunk and info.language != state["locked_language"] and info.language_probability > 0.70:
+                logger.info(f"[{session_id}] Dil tespiti: {info.language} ({info.language_probability:.0%}) — kilitli: {state['locked_language']}")
+                state["locked_language"] = info.language
+                state["lock_votes"] = 2
+                logger.info(f"[{session_id}] Dil anında değişti → {info.language}")
                 # Yanlış dilde çözülen metni at, bir sonraki chunk doğru dilde gelecek
-                if text and self._locked_language != use_language:
+                if text and state["locked_language"] != use_language:
                     return {"text": "", "language": info.language, "confidence": round(info.language_probability, 2)}
             language = info.language
             confidence = round(max(0.0, min(1.0, info.language_probability)), 2)
 
-            # Dil kilidi güncelle
-            self._update_language_lock(language, confidence)
+            # Dil kilidi güncelle (session bazlı)
+            self._update_language_lock(language, confidence, state)
 
             # Halüsinasyon tespiti
             if text and self._is_hallucination(text):
                 logger.warning(f"Halüsinasyon tespit edildi, atlandı: {text[:60]}")
                 return {"text": "", "language": language, "confidence": confidence}
 
-            logger.info(f"[{language} {confidence:.0%}] lock={self._locked_language}: {text[:80]}")
+            logger.info(f"[{session_id}] [{language} {confidence:.0%}] lock={state['locked_language']}: {text[:80]}")
             return {"text": text, "language": language, "confidence": confidence}
 
         except Exception as e:
@@ -138,30 +158,68 @@ class WhisperService:
             audio = audio / peak * 0.95
         return audio
 
-    def _update_language_lock(self, language: str, confidence: float):
-        """Aynı dil gelince vote artır, farklı dil gelince hızla düşür."""
-        if confidence < 0.70:
+    def _update_language_lock(self, language: str, confidence: float, state: dict):
+        """Aynı dil gelince vote artır, farklı dil gelince yavaşça düşür.
+        Daha stabil: düşük confidence dil değişimlerini engeller."""
+        if confidence < 0.75:
+            # Düşük güven — hiçbir şey yapma, mevcut kilidi koru
             return
-        if language == self._locked_language:
-            self._lock_votes = min(self._lock_votes + 1, 5)
+        if language == state["locked_language"]:
+            state["lock_votes"] = min(state["lock_votes"] + 1, 7)
         else:
-            # Farklı dil — vote'u hızla düşür
-            self._lock_votes -= 1
-            if self._lock_votes <= 0:
-                self._locked_language = language
-                self._lock_votes = 1
+            # Farklı dil — yüksek güvenle bile yavaş düşür
+            if confidence >= 0.90:
+                state["lock_votes"] -= 2  # çok yüksek güven: hızlı geçiş
+            else:
+                state["lock_votes"] -= 1  # orta güven: yavaş geçiş
+            if state["lock_votes"] <= 0:
+                state["locked_language"] = language
+                state["lock_votes"] = 2
                 logger.info(f"Dil değişti → {language} (confidence={confidence:.0%})")
 
+    # Whisper'ın bilinen halüsinasyon kalıpları (tüm dillerde)
+    HALLUCINATION_PATTERNS = {
+        # Arapça YouTube halüsinasyonları
+        "اشتركوا في القناة",  # "Kanala abone olun"
+        "شكرا لمشاهدتكم",    # "İzlediğiniz için teşekkürler"
+        "ترجمة",              # "Çeviri"
+        # İngilizce
+        "thank you",
+        "thanks for watching",
+        "subscribe",
+        "please subscribe",
+        "like and subscribe",
+        # Türkçe
+        "altyazı m.k.",
+        "altyazı",
+        "abone olun",
+        # Urduca/Farsça karışımları
+        "موسیقی",             # "Müzik"
+    }
+
     def _is_hallucination(self, text: str) -> bool:
-        """Tekrar eden kelime/ifade döngüsü tespiti."""
+        """Gelişmiş halüsinasyon tespiti: kalıp + tekrar + kısa saçmalık."""
+        text_lower = text.strip().lower()
+
+        # 1. Bilinen halüsinasyon kalıpları
+        for pattern in self.HALLUCINATION_PATTERNS:
+            if text_lower == pattern.lower() or text_lower == pattern:
+                return True
+
+        # 2. Çok kısa + düşük bilgi içeriği (1-2 karakter/kelime saçmalıklar)
         words = text.split()
-        if len(words) < 6:
-            return False
-        third = len(words) // 3
-        p1 = " ".join(words[:third])
-        p2 = " ".join(words[third:2 * third])
-        if p1.strip() and p1.strip() == p2.strip():
-            return True
+        if len(words) == 1 and len(text) <= 3:
+            return True  # "شكرا", "it.", "ok" gibi
+
+        # 3. Tekrar eden kelime/ifade döngüsü
+        if len(words) >= 6:
+            third = len(words) // 3
+            p1 = " ".join(words[:third])
+            p2 = " ".join(words[third:2 * third])
+            if p1.strip() and p1.strip() == p2.strip():
+                return True
+
+        # 4. N-gram tekrarı
         n = 4
         if len(words) >= n * 3:
             for i in range(len(words) - n):
@@ -172,6 +230,7 @@ class WhisperService:
                 )
                 if count >= 3:
                     return True
+
         return False
 
     def _bytes_to_numpy(self, audio_bytes: bytes) -> np.ndarray:

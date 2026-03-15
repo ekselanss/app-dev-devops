@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@videocheviri_server_url';
+const TIER_STORAGE_KEY = '@videocheviri_tier';
 const DEFAULT_URL = 'https://ski-nearby-cruise-drawn.trycloudflare.com';
 
 let cachedUrl: string | null = null;
+let cachedTier: 'free' | 'pro' = 'free';
 
 /**
  * Sunucu URL'sini AsyncStorage'dan yükle.
@@ -39,6 +41,34 @@ export function getServerUrl(): string {
 }
 
 /**
+ * Tier'ı yükle
+ */
+export async function loadTier(): Promise<'free' | 'pro'> {
+  try {
+    const saved = await AsyncStorage.getItem(TIER_STORAGE_KEY);
+    cachedTier = (saved === 'pro') ? 'pro' : 'free';
+  } catch {
+    cachedTier = 'free';
+  }
+  return cachedTier;
+}
+
+/**
+ * Tier'ı kaydet
+ */
+export async function saveTier(tier: 'free' | 'pro'): Promise<void> {
+  cachedTier = tier;
+  await AsyncStorage.setItem(TIER_STORAGE_KEY, tier);
+}
+
+/**
+ * Mevcut tier'ı getir (senkron)
+ */
+export function getTier(): 'free' | 'pro' {
+  return cachedTier;
+}
+
+/**
  * WebSocket URL'lerini oluştur.
  */
 export function getWsUrls() {
@@ -47,6 +77,7 @@ export function getWsUrls() {
   return {
     translate: `${wsBase}/ws/translate`,
     fast: `${wsBase}/ws/fast`,
+    pro: `${wsBase}/ws/pro`,
     http: base,
   };
 }

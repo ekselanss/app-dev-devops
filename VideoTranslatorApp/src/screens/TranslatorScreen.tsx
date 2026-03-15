@@ -34,7 +34,8 @@ import { ConnectionStatusBar } from '../components/ConnectionStatusBar';
 import { requestMicrophonePermission } from '../utils/permissions';
 import { useTranslationHistory } from '../hooks/useTranslationHistory';
 import { HistoryScreen } from './HistoryScreen';
-import { loadServerUrl, saveServerUrl, getServerUrl } from '../utils/serverConfig';
+import { loadServerUrl, saveServerUrl, getServerUrl, loadTier, saveTier, getTier } from '../utils/serverConfig';
+import { checkAndPromptUpdate } from '../services/UpdateService';
 
 const OverlayNative = NativeModules.OverlayService;
 const ForegroundService = NativeModules.ForegroundService;
@@ -83,16 +84,21 @@ export function TranslatorScreen() {
   const [serverUrlInput, setServerUrlInput] = useState('');
   const [targetLanguage, setTargetLanguage] = useState('tr');
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const [tier, setTier] = useState<'free' | 'pro'>('free');
+  const [activeModel, setActiveModel] = useState('');
 
   const { history, addEntry, deleteEntry, clearAll } = useTranslationHistory();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Sunucu URL'sini yükle
+  // Sunucu URL'sini ve tier'ı yükle + güncelleme kontrolü
   useEffect(() => {
     loadServerUrl().then(url => {
       setServerUrl(url);
       setServerUrlInput(url);
     });
+    loadTier().then(t => setTier(t));
+    // Uygulama açılışında güncelleme kontrol et
+    checkAndPromptUpdate();
   }, []);
 
   // Overlay izni kontrol
@@ -133,6 +139,15 @@ export function TranslatorScreen() {
 
   const handleWSMessage = useCallback((message: WSMessage) => {
     switch (message.type) {
+      case 'connected':
+        // Bağlantı kurulduğunda tier ve model bilgisini güncelle
+        if (message.tier) setTier(message.tier as 'free' | 'pro');
+        if (message.model) setActiveModel(message.model);
+        break;
+      case 'tier_changed':
+        if (message.tier) setTier(message.tier as 'free' | 'pro');
+        if (message.model) setActiveModel(message.model);
+        break;
       case 'translation':
         setIsProcessing(false);
         setTranslation({
@@ -141,7 +156,7 @@ export function TranslatorScreen() {
           detectedLanguage: message.detected_language ?? '',
           confidence: message.confidence ?? 0,
         });
-        if (OverlayNative && message.translated) OverlayNative.updateText(message.original ?? '', message.translated);
+        if (OverlayNative && message.translated) OverlayNative.updateTextWithLang(message.original ?? '', message.translated, message.detected_language ?? '', targetLangRef.current ?? 'tr');
         if (ForegroundService && message.translated) ForegroundService.updateNotification(message.translated.slice(0, 60));
         addEntry({ original: message.original ?? '', translated: message.translated ?? '', detectedLanguage: message.detected_language ?? '' });
         break;
@@ -241,7 +256,7 @@ export function TranslatorScreen() {
         {/* Üst Bar */}
         <View style={styles.topBar}>
           <Text style={styles.appTitle}>🎬 VideoÇeviri</Text>
-          {isActive && <ConnectionStatusBar status={connectionStatus} />}
+          {isActive && <ConnectionStatusBar status={connectionStatus} tier={tier} model={activeModel} />}
           <View style={styles.topBarRight}>
             <TouchableOpacity onPress={() => { setServerUrlInput(getServerUrl()); setShowSettings(true); }} style={styles.settingsBtn}>
               <Text style={styles.settingsBtnText}>⚙️</Text>
@@ -252,11 +267,30 @@ export function TranslatorScreen() {
           </View>
         </View>
 
-        {/* Mod etiketi + Dil seçici */}
+        {/* Tier + Mod etiketi + Dil seçici */}
         <View style={styles.modeBadgeRow}>
+          <TouchableOpacity
+            style={[styles.tierBadge, tier === 'pro' && styles.tierBadgePro]}
+            onPress={async () => {
+              const newTier = tier === 'free' ? 'pro' : 'free';
+              await saveTier(newTier);
+              setTier(newTier);
+              if (isActive && !useSpeechMode) {
+                // Aktif bağlantı varsa otomatik yeniden bağlan
+                wsService.disconnect();
+                setActiveModel('');
+                setTimeout(() => {
+                  wsService.connect(handleWSMessage, setConnectionStatus);
+                }, 500);
+              }
+            }}>
+            <Text style={[styles.tierBadgeText, tier === 'pro' && styles.tierBadgeTextPro]}>
+              {tier === 'pro' ? '⭐ PRO' : '🆓 FREE'}
+            </Text>
+          </TouchableOpacity>
           <View style={styles.modeBadge}>
             <Text style={styles.modeBadgeText}>
-              {useSpeechMode ? '🎙 Konuşma Tanıma' : '🎤 Mikrofon → Whisper AI'}
+              {useSpeechMode ? '🎙 Konuşma' : activeModel ? `🎤 ${activeModel}` : '🎤 Whisper AI'}
             </Text>
           </View>
           <TouchableOpacity
@@ -324,6 +358,7 @@ export function TranslatorScreen() {
             translated={translation.translated}
             original={translation.original}
             detectedLanguage={translation.detectedLanguage}
+            targetLanguage={targetLanguage}
             confidence={translation.confidence}
             isProcessing={isProcessing}
             showOriginal={showOriginal}
@@ -424,9 +459,13 @@ const styles = StyleSheet.create({
   settingsBtnText: { fontSize: 18 },
   historyBtn: { padding: 6 },
   historyBtnText: { fontSize: 18, color: '#888' },
-  modeBadgeRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' },
-  modeBadge: { backgroundColor: '#1a1a2e', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4, borderWidth: 1, borderColor: '#333' },
-  modeBadgeText: { color: '#888', fontSize: 12, fontWeight: '600' },
+  modeBadgeRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' },
+  tierBadge: { backgroundColor: '#1a1a2e', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#555' },
+  tierBadgePro: { backgroundColor: '#2e2a1a', borderColor: '#FFD700' },
+  tierBadgeText: { color: '#888', fontSize: 11, fontWeight: '700' },
+  tierBadgeTextPro: { color: '#FFD700' },
+  modeBadge: { backgroundColor: '#1a1a2e', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: '#333' },
+  modeBadgeText: { color: '#888', fontSize: 11, fontWeight: '600' },
   langBadge: { backgroundColor: '#1a2e1a', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4, borderWidth: 1, borderColor: '#4CAF50' },
   langBadgeText: { color: '#4CAF50', fontSize: 12, fontWeight: '600' },
   langGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16, justifyContent: 'center' },

@@ -1,4 +1,4 @@
-export type WSMessageType = 'connected' | 'translation' | 'processing' | 'empty' | 'error' | 'ping' | 'pong';
+export type WSMessageType = 'connected' | 'translation' | 'processing' | 'empty' | 'error' | 'ping' | 'pong' | 'tier_changed' | 'language_changed';
 
 export interface WSMessage {
   type: WSMessageType;
@@ -9,12 +9,15 @@ export interface WSMessage {
   detected_language?: string;
   confidence?: number;
   provider?: string;
+  tier?: string;
+  model?: string;
+  audio_mode?: string;
 }
 
 type MessageHandler = (message: WSMessage) => void;
 type StatusHandler = (status: 'connecting' | 'connected' | 'disconnected' | 'error') => void;
 
-import { getWsUrls } from '../utils/serverConfig';
+import { getWsUrls, getTier } from '../utils/serverConfig';
 
 /**
  * Accessibility/SpeechRecognizer modunda metin doğrudan çevrilir.
@@ -47,6 +50,8 @@ class WebSocketService {
   private reconnectAttempts = 0;
   private isIntentionalDisconnect = false;
   private baseUrl: string = '';
+  private currentTier: string = 'free';
+  private currentModel: string = '';
 
   constructor() {
     this.sessionId = 'mobile_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -57,9 +62,21 @@ class WebSocketService {
     this.statusHandler = onStatus;
     this.isIntentionalDisconnect = false;
     const urls = getWsUrls();
-    this.baseUrl = fast ? urls.fast : urls.translate;
+    const tier = getTier();
+    this.currentTier = tier;
+
+    // Tier'a göre endpoint seç
+    if (tier === 'pro') {
+      this.baseUrl = urls.pro;
+    } else {
+      this.baseUrl = fast ? urls.fast : urls.translate;
+    }
+    console.log(`[WS] Tier: ${tier}, URL: ${this.baseUrl}`);
     this._connect();
   }
+
+  getTier(): string { return this.currentTier; }
+  getModel(): string { return this.currentModel; }
 
   disconnect() {
     this.isIntentionalDisconnect = true;
@@ -110,6 +127,12 @@ class WebSocketService {
       this.ws.onmessage = (event) => {
         try {
           const message: WSMessage = JSON.parse(event.data);
+          // Connected mesajından tier ve model bilgisini al
+          if (message.type === 'connected') {
+            this.currentTier = message.tier || this.currentTier;
+            this.currentModel = message.model || '';
+            console.log(`[WS] Connected: tier=${this.currentTier}, model=${this.currentModel}`);
+          }
           console.log('[WS<]', message.type, message.type === 'translation' ? message.translated?.slice(0, 40) : '');
           this.messageHandler?.(message);
         } catch (e) {

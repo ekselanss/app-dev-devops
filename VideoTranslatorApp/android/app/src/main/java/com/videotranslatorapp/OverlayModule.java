@@ -56,10 +56,17 @@ public class OverlayModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void updateText(String original, String translated) {
+        updateTextWithLang(original, translated, "", "tr");
+    }
+
+    @ReactMethod
+    public void updateTextWithLang(String original, String translated, String detectedLanguage, String targetLanguage) {
         Intent intent = new Intent(reactContext, OverlayService.class);
         intent.setAction(OverlayService.ACTION_UPDATE);
         intent.putExtra(OverlayService.EXTRA_ORIGINAL, original);
         intent.putExtra(OverlayService.EXTRA_TRANSLATED, translated);
+        intent.putExtra(OverlayService.EXTRA_LANGUAGE, detectedLanguage != null ? detectedLanguage : "");
+        intent.putExtra(OverlayService.EXTRA_TARGET_LANG, targetLanguage != null ? targetLanguage : "tr");
         reactContext.startService(intent);
     }
 }
