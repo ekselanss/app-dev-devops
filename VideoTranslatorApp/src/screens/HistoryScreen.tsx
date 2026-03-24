@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,128 +6,168 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
-  SafeAreaView,
-  StatusBar,
+  ActivityIndicator,
 } from 'react-native';
-import { HistoryItem } from '../hooks/useTranslationHistory';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { apiService, Session } from '../services/ApiService';
 
 const LANG_FLAGS: Record<string, string> = {
   en: '🇬🇧', de: '🇩🇪', fr: '🇫🇷', es: '🇪🇸', it: '🇮🇹',
   pt: '🇵🇹', ru: '🇷🇺', ja: '🇯🇵', ko: '🇰🇷', zh: '🇨🇳',
-  ar: '🇸🇦', nl: '🇳🇱',
+  ar: '🇸🇦', nl: '🇳🇱', tr: '🇹🇷',
 };
 
-function formatTime(ts: number): string {
-  const d = new Date(ts);
-  const now = new Date();
-  const diff = now.getTime() - ts;
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}sn`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m}dk ${s}sn` : `${m}dk`;
+}
 
-  if (diff < 60000) return 'Az önce';
-  if (diff < 3600000) return `${Math.floor(diff / 60000)} dk önce`;
-  if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+function formatDate(isoStr: string): string {
+  try {
+    const d = new Date(isoStr);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    if (diff < 60000) return 'Az önce';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)} dk önce`;
+    if (d.toDateString() === now.toDateString()) {
+      return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+  } catch {
+    return isoStr;
   }
-  return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 interface Props {
-  history: HistoryItem[];
-  onDelete: (id: string) => void;
-  onClearAll: () => void;
-  onClose: () => void;
+  navigate: (screen: string) => void;
 }
 
-export function HistoryScreen({ history, onDelete, onClearAll, onClose }: Props) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+export function HistoryScreen({ navigate }: Props) {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalMinutes, setTotalMinutes] = useState(0);
+  const [totalTokens, setTotalTokens] = useState(0);
 
-  const handleClearAll = () => {
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const [sess, stats] = await Promise.all([
+      apiService.getSessions(),
+      apiService.getStats(),
+    ]);
+    setSessions(sess);
+    if (stats) {
+      setTotalMinutes(stats.total_minutes);
+      setTotalTokens(stats.total_tokens_used);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleDelete = (id: string, title: string) => {
     Alert.alert(
-      'Geçmişi Sil',
-      'Tüm çeviri geçmişi silinecek. Emin misin?',
+      'Oturumu Sil',
+      `"${title}" silinecek. Emin misin?`,
       [
         { text: 'İptal', style: 'cancel' },
-        { text: 'Sil', style: 'destructive', onPress: onClearAll },
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await apiService.deleteSession(id);
+            if (ok) {
+              setSessions(prev => prev.filter(s => s.id !== id));
+            }
+          },
+        },
       ]
     );
   };
 
-  const handleDelete = (id: string) => {
-    Alert.alert(
-      'Kaydı Sil',
-      'Bu çeviri kaydı silinecek.',
-      [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Sil', style: 'destructive', onPress: () => onDelete(id) },
-      ]
-    );
-  };
-
-  const renderItem = ({ item }: { item: HistoryItem }) => {
-    const isExpanded = expandedId === item.id;
-    const flag = LANG_FLAGS[item.detectedLanguage] ?? '🌐';
+  const renderItem = ({ item }: { item: Session }) => {
+    const srcFlag = LANG_FLAGS[item.source_lang] ?? '🌐';
+    const tgtFlag = LANG_FLAGS[item.target_lang] ?? '🌐';
 
     return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => setExpandedId(isExpanded ? null : item.id)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.cardHeader}>
-          <View style={styles.cardMeta}>
-            <Text style={styles.flag}>{flag}</Text>
-            <Text style={styles.time}>{formatTime(item.timestamp)}</Text>
+      <View style={styles.card}>
+        <View style={styles.cardLeft}>
+          <Text style={styles.cardIcon}>{item.icon || '🎙'}</Text>
+          <View style={styles.cardInfo}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+            <Text style={styles.cardMeta}>
+              {srcFlag} → {tgtFlag}  ·  {formatDuration(item.duration_seconds)}  ·  {item.tokens_used} 🪙
+            </Text>
+            <Text style={styles.cardDate}>{formatDate(item.created_at)}</Text>
           </View>
-          <TouchableOpacity onPress={() => handleDelete(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={styles.deleteBtn}>✕</Text>
-          </TouchableOpacity>
         </View>
-
-        <Text style={styles.translated} numberOfLines={isExpanded ? undefined : 2}>
-          {item.translated}
-        </Text>
-
-        {isExpanded && (
-          <Text style={styles.original}>{item.original}</Text>
-        )}
-
-        {!isExpanded && item.translated.length > 80 && (
-          <Text style={styles.expandHint}>Daha fazla göster</Text>
-        )}
-      </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => handleDelete(item.id, item.title)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.deleteBtn}>✕</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
-
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-          <Text style={styles.closeBtnText}>← Geri</Text>
+        <TouchableOpacity onPress={() => navigate('Home')} style={styles.backBtn}>
+          <Text style={styles.backText}>← Geri</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Çeviri Geçmişi</Text>
-        {history.length > 0 ? (
-          <TouchableOpacity onPress={handleClearAll}>
-            <Text style={styles.clearBtn}>Temizle</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 60 }} />
-        )}
+        <Text style={styles.title}>Geçmiş</Text>
+        <View style={{ width: 60 }} />
       </View>
 
-      {history.length === 0 ? (
-        <View style={styles.empty}>
+      {/* Stats */}
+      {sessions.length > 0 && (
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{sessions.length}</Text>
+            <Text style={styles.statLabel}>Oturum</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{totalMinutes}</Text>
+            <Text style={styles.statLabel}>Dakika</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{totalTokens}</Text>
+            <Text style={styles.statLabel}>Token</Text>
+          </View>
+        </View>
+      )}
+
+      {/* List */}
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color="#6c63ff" size="large" />
+        </View>
+      ) : sessions.length === 0 ? (
+        <View style={styles.center}>
           <Text style={styles.emptyIcon}>📋</Text>
           <Text style={styles.emptyText}>Henüz çeviri geçmişi yok</Text>
-          <Text style={styles.emptyHint}>Kayıt başlatıp konuşunca çeviriler burada görünür</Text>
+          <Text style={styles.emptyHint}>Canlı çeviri yaptıktan sonra burada görünür</Text>
+          <TouchableOpacity style={styles.startBtn} onPress={() => navigate('LiveTranslation')}>
+            <Text style={styles.startBtnText}>Çeviri Başlat</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={history}
-          keyExtractor={(item) => item.id}
+          data={sessions}
+          keyExtractor={item => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          onRefresh={loadData}
+          refreshing={loading}
         />
       )}
     </SafeAreaView>
@@ -137,7 +177,7 @@ export function HistoryScreen({ history, onDelete, onClearAll, onClose }: Props)
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#0a0a0f',
   },
   header: {
     flexDirection: 'row',
@@ -146,97 +186,53 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e1e1e',
+    borderBottomColor: 'rgba(108,99,255,0.12)',
   },
-  closeBtn: {
-    width: 60,
+  backBtn: { width: 60 },
+  backText: { color: '#6c63ff', fontSize: 15 },
+  title: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(108,99,255,0.08)',
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(108,99,255,0.15)',
   },
-  closeBtnText: {
-    color: '#4CAF50',
-    fontSize: 15,
+  statBox: { flex: 1, alignItems: 'center' },
+  statDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
+  statValue: { color: '#6c63ff', fontSize: 22, fontWeight: '700' },
+  statLabel: { color: '#6b6b8a', fontSize: 11, marginTop: 2 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32 },
+  emptyIcon: { fontSize: 48 },
+  emptyText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  emptyHint: { color: '#6b6b8a', fontSize: 14, textAlign: 'center' },
+  startBtn: {
+    marginTop: 8,
+    backgroundColor: '#6c63ff',
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
   },
-  title: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  clearBtn: {
-    color: '#ff5252',
-    fontSize: 14,
-    width: 60,
-    textAlign: 'right',
-  },
-  list: {
-    padding: 12,
-    gap: 10,
-  },
+  startBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  list: { padding: 16, gap: 10 },
   card: {
-    backgroundColor: '#141414',
+    backgroundColor: '#13131f',
     borderRadius: 12,
     padding: 14,
-    borderWidth: 1,
-    borderColor: '#222',
-  },
-  cardHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  cardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  flag: {
-    fontSize: 16,
-  },
-  time: {
-    color: '#555',
-    fontSize: 12,
-  },
-  deleteBtn: {
-    color: '#444',
-    fontSize: 14,
-    padding: 2,
-  },
-  translated: {
-    color: '#fff',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  original: {
-    color: '#666',
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#222',
-  },
-  expandHint: {
-    color: '#4CAF50',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 32,
-  },
-  emptyIcon: {
-    fontSize: 48,
-  },
-  emptyText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  emptyHint: {
-    color: '#555',
-    fontSize: 14,
-    textAlign: 'center',
-  },
+  cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  cardIcon: { fontSize: 28 },
+  cardInfo: { flex: 1 },
+  cardTitle: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  cardMeta: { color: '#6b6b8a', fontSize: 12, marginTop: 3 },
+  cardDate: { color: '#444', fontSize: 11, marginTop: 2 },
+  deleteBtn: { color: '#444', fontSize: 16, padding: 4 },
 });

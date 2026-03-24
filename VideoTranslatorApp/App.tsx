@@ -7,9 +7,11 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { LiveTranslationScreen } from './src/screens/LiveTranslationScreen';
 import { TokenShopScreen } from './src/screens/TokenShopScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { HistoryScreen } from './src/screens/HistoryScreen';
+import { TranslatorScreen } from './src/screens/TranslatorScreen';
 
 // All possible screens
-type ScreenName = 'Onboarding' | 'Home' | 'LiveTranslation' | 'TokenShop' | 'Profile';
+type ScreenName = 'Onboarding' | 'Home' | 'LiveTranslation' | 'TokenShop' | 'Profile' | 'History' | 'Translator';
 
 // Bottom tab definitions (shown after onboarding)
 const TABS: { screen: ScreenName; icon: string; label: string }[] = [
@@ -47,6 +49,10 @@ export default function App() {
         return <TokenShopScreen navigate={navigate} />;
       case 'Profile':
         return <ProfileScreen navigate={navigate} />;
+      case 'History':
+        return <HistoryScreen navigate={navigate} />;
+      case 'Translator':
+        return <TranslatorScreen navigate={navigate} />;
       default:
         return <HomeScreen navigate={navigate} />;
     }

@@ -134,10 +134,10 @@ export function HomeScreen({ navigate }: HomeScreenProps) {
             <Text style={styles.headerTitle}>Merhaba, İsmail 👋</Text>
             <Text style={styles.headerSub}>Bugün ne izlemek istiyorsun?</Text>
           </View>
-          <View style={styles.avatar}>
+          <TouchableOpacity style={styles.avatar} onPress={() => navigate('Profile')} activeOpacity={0.8}>
             <Text style={styles.avatarText}>İ</Text>
             <View style={styles.avatarBadge} />
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Token Card */}
@@ -179,7 +179,7 @@ export function HomeScreen({ navigate }: HomeScreenProps) {
             <Text style={styles.modeDesc}>Gerçek zamanlı çeviri</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.modeCard} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.modeCard} activeOpacity={0.8} onPress={() => navigate('Translator')}>
             <View style={[styles.modeIcon, styles.modeIcon2]}>
               <Text style={styles.modeIconText}>🎥</Text>
             </View>
@@ -187,7 +187,7 @@ export function HomeScreen({ navigate }: HomeScreenProps) {
             <Text style={styles.modeDesc}>Galeriden video seç</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.modeCard} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.modeCard} activeOpacity={0.8} onPress={() => navigate('Translator')}>
             <View style={[styles.modeIcon, styles.modeIcon3]}>
               <Text style={styles.modeIconText}>🔗</Text>
             </View>
@@ -199,7 +199,7 @@ export function HomeScreen({ navigate }: HomeScreenProps) {
         {/* Recent Sessions */}
         <View style={styles.sectionTitle}>
           <Text style={styles.sectionTitleText}>Son Oturumlar</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => navigate('History')}>
             <Text style={styles.sectionLink}>Tümü →</Text>
           </TouchableOpacity>
         </View>

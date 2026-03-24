@@ -30,6 +30,13 @@ def reset_state():
         "lifetime_used": 8550,
         "lifetime_purchased": 11000,
     })
+    user_module._user_settings.update({
+        "default_model": "base",
+        "target_language": "tr",
+        "subtitle_size": "medium",
+        "token_alert_enabled": True,
+        "dark_mode": True,
+    })
     sessions_module._sessions.clear()
     sessions_module._sessions.extend([
         {
@@ -354,3 +361,69 @@ class TestTokenDeduct:
         client.post("/api/tokens/deduct", json={"amount": 100, "reason": "test"})
         after = client.get("/api/user/tokens").json()["lifetime_used"]
         assert after == before + 100
+
+
+class TestUserSettings:
+    def test_get_settings_returns_200(self):
+        res = client.get("/api/user/settings")
+        assert res.status_code == 200
+
+    def test_get_settings_fields(self):
+        data = client.get("/api/user/settings").json()
+        assert "default_model" in data
+        assert "target_language" in data
+        assert "subtitle_size" in data
+        assert "token_alert_enabled" in data
+        assert "dark_mode" in data
+
+    def test_get_settings_defaults(self):
+        data = client.get("/api/user/settings").json()
+        assert data["default_model"] == "base"
+        assert data["target_language"] == "tr"
+        assert data["subtitle_size"] == "medium"
+        assert data["token_alert_enabled"] is True
+        assert data["dark_mode"] is True
+
+    def test_update_default_model(self):
+        res = client.put("/api/user/settings", json={"default_model": "small"})
+        assert res.status_code == 200
+        assert res.json()["default_model"] == "small"
+
+    def test_update_target_language(self):
+        res = client.put("/api/user/settings", json={"target_language": "en"})
+        assert res.status_code == 200
+        assert res.json()["target_language"] == "en"
+
+    def test_update_subtitle_size(self):
+        res = client.put("/api/user/settings", json={"subtitle_size": "large"})
+        assert res.status_code == 200
+        assert res.json()["subtitle_size"] == "large"
+
+    def test_update_token_alert(self):
+        res = client.put("/api/user/settings", json={"token_alert_enabled": False})
+        assert res.status_code == 200
+        assert res.json()["token_alert_enabled"] is False
+
+    def test_update_dark_mode(self):
+        res = client.put("/api/user/settings", json={"dark_mode": False})
+        assert res.status_code == 200
+        assert res.json()["dark_mode"] is False
+
+    def test_partial_update_preserves_other_fields(self):
+        client.put("/api/user/settings", json={"target_language": "de"})
+        data = client.get("/api/user/settings").json()
+        assert data["target_language"] == "de"
+        assert data["subtitle_size"] == "medium"  # unchanged
+        assert data["dark_mode"] is True  # unchanged
+
+    def test_update_multiple_fields(self):
+        res = client.put("/api/user/settings", json={
+            "default_model": "pro",
+            "target_language": "fr",
+            "subtitle_size": "small",
+        })
+        assert res.status_code == 200
+        data = res.json()
+        assert data["default_model"] == "pro"
+        assert data["target_language"] == "fr"
+        assert data["subtitle_size"] == "small"

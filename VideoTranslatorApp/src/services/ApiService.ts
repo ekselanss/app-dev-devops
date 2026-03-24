@@ -67,6 +67,14 @@ export interface DeductResponse {
   new_balance: number;
 }
 
+export interface UserSettings {
+  default_model: string;
+  target_language: string;
+  subtitle_size: string;
+  token_alert_enabled: boolean;
+  dark_mode: boolean;
+}
+
 // ── Singleton ApiService ───────────────────────────────────────────────────
 
 class ApiService {
@@ -114,6 +122,21 @@ class ApiService {
     }
   }
 
+  private async put<T>(path: string, body: object): Promise<T | null> {
+    try {
+      const base = this.baseUrl();
+      const res = await fetch(`${base}${path}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) return null;
+      return (await res.json()) as T;
+    } catch {
+      return null;
+    }
+  }
+
   private async del<T>(path: string): Promise<T | null> {
     try {
       const base = this.baseUrl();
@@ -134,8 +157,16 @@ class ApiService {
     return this.get<UserProfile>('/api/user/profile');
   }
 
-  async updateUserProfile(name: string): Promise<UserProfile | null> {
-    return this.post<UserProfile>('/api/user/profile', { name });
+  async updateUserProfile(name: string, email?: string, avatar_emoji?: string): Promise<UserProfile | null> {
+    return this.put<UserProfile>('/api/user/profile', { name, email, avatar_emoji });
+  }
+
+  async getUserSettings(): Promise<UserSettings | null> {
+    return this.get<UserSettings>('/api/user/settings');
+  }
+
+  async updateUserSettings(settings: Partial<UserSettings>): Promise<UserSettings | null> {
+    return this.put<UserSettings>('/api/user/settings', settings);
   }
 
   async getUserTokens(): Promise<TokenBalance | null> {
