@@ -1,39 +1,100 @@
 #!/usr/bin/env bash
-# VideoÇeviri — Anlık Durum Raporu
+# Anlık durum özeti — istediğinde çalıştır
 # Kullanım: ./status.sh
 
-PROJ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$PROJ"
+# Renkler
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+GRAY='\033[0;37m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; RED='\033[0;31m'; NC='\033[0m'
+clear
+echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BOLD}    Subtitle App — Durum Raporu${NC}"
+echo -e "${BOLD}    $(date '+%d %b %Y %H:%M')${NC}"
+echo -e "${BOLD}${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
 
-echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║   VideoÇeviri — Proje Durumu         ║${NC}"
-echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
+# Versiyon
+VERSION=$(cat VERSION 2>/dev/null || echo "bilinmiyor")
+echo -e "${YELLOW}📦 MEVCUT VERSİYON: $VERSION${NC}"
+echo ""
 
-echo -e "\n${YELLOW}📦 Versiyon:${NC}"
-cat VERSION 2>/dev/null || echo "VERSION dosyası yok"
+# Son commitler
+echo -e "${CYAN}🔖 SON 5 COMMİT:${NC}"
+git log --oneline -5 2>/dev/null | while read -r line; do
+  echo -e "   ${GRAY}$line${NC}"
+done
+echo ""
 
-echo -e "\n${YELLOW}🌿 Aktif Branch:${NC}"
-git branch --show-current
+# Bekleyen görevler
+echo -e "${CYAN}📋 BEKLEYEN GÖREVLER:${NC}"
+grep '^\- \[ \]' TODO.md 2>/dev/null | head -5 | while read -r line; do
+  echo -e "   ${YELLOW}$line${NC}"
+done
+DONE_COUNT=$(grep -c '^\- \[x\]' TODO.md 2>/dev/null || echo 0)
+TOTAL_COUNT=$(grep -c '^\- \[' TODO.md 2>/dev/null || echo 0)
+echo -e "   ${GRAY}Tamamlanan: $DONE_COUNT / $TOTAL_COUNT${NC}"
+echo ""
 
-echo -e "\n${YELLOW}📋 Tüm Branch'ler:${NC}"
-git branch -a | grep -v 'HEAD'
+# Release notes
+echo -e "${CYAN}📄 RELEASE NOTES:${NC}"
+ls RELEASE_NOTES/*.md 2>/dev/null | sort -V | tail -5 | while read -r f; do
+  echo -e "   ${GREEN}$(basename $f)${NC}"
+done
+echo ""
 
-echo -e "\n${YELLOW}🕐 Son 5 Commit:${NC}"
-git log --oneline -5
+# Son aktivite
+echo -e "${CYAN}⚡ SON 10 AKTİVİTE:${NC}"
+if [ -f ".claude/logs/activity.log" ]; then
+  tail -10 ".claude/logs/activity.log" | while read -r line; do
+    echo -e "   ${GRAY}$line${NC}"
+  done
+else
+  echo -e "   ${GRAY}Henüz aktivite yok${NC}"
+fi
+echo ""
 
-echo -e "\n${YELLOW}⏳ Bekleyen Görevler:${NC}"
-grep '^\- \[ \]' TODO.md 2>/dev/null | head -5 || echo "TODO.md yok"
+# Test durumu
+echo -e "${CYAN}🧪 SON TEST SONUCU:${NC}"
+if [ -f ".claude/logs/tests.log" ]; then
+  LAST_TEST=$(grep -E "passed|failed|error" ".claude/logs/tests.log" 2>/dev/null | tail -3)
+  if [ -n "$LAST_TEST" ]; then
+    echo "$LAST_TEST" | while read -r line; do
+      if echo "$line" | grep -qiE "failed|error"; then
+        echo -e "   ${RED}$line${NC}"
+      else
+        echo -e "   ${GREEN}$line${NC}"
+      fi
+    done
+  else
+    echo -e "   ${GRAY}Test logu var ama sonuç yok${NC}"
+  fi
+else
+  echo -e "   ${GRAY}Henüz test çalışmadı${NC}"
+fi
+echo ""
 
-echo -e "\n${YELLOW}✅ Tamamlananlar:${NC}"
-grep '^\- \[x\]' TODO.md 2>/dev/null | head -5 || echo "Henüz tamamlanan yok"
+# Claude çalışıyor mu?
+echo -e "${CYAN}🤖 CLAUDE DURUMU:${NC}"
+if tmux has-session -t subtitle-claude 2>/dev/null; then
+  echo -e "   ${GREEN}✓ Çalışıyor (tmux: subtitle-claude)${NC}"
+  echo -e "   ${GRAY}İzlemek için: tmux attach -t subtitle-claude${NC}"
+else
+  echo -e "   ${RED}✗ Çalışmıyor${NC}"
+  echo -e "   ${GRAY}Başlatmak için: ./start.sh${NC}"
+fi
 
-echo -e "\n${YELLOW}📜 Son Aktivite (.claude/live.log):${NC}"
-tail -20 .claude/live.log 2>/dev/null || echo "Henüz log yok (Claude çalışmadı)"
+# Tıkandı mı?
+if [ -f "BLOCKED.md" ] && [ -s "BLOCKED.md" ]; then
+  echo ""
+  echo -e "${RED}⚠️  CLAUDE TIKANMIŞ — BLOCKED.md'ye bak!${NC}"
+  cat BLOCKED.md
+fi
 
-echo -e "\n${YELLOW}🧪 Son Test Sonucu:${NC}"
-cat e2e-test/last_result.txt 2>/dev/null | tail -10 || echo "E2E test sonucu yok"
-
-echo -e "\n${BLUE}════════════════════════════════════════${NC}"
-echo -e "Canlı log için: ${YELLOW}tail -f .claude/live.log${NC}"
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
