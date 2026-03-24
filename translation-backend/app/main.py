@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import websocket, health, benchmark, translate
+from app.routers import websocket, health, benchmark, translate, user, sessions, tokens
 from app.services.whisper_service import WhisperService
 from app.services.translation_service import TranslationService
 from app.services.vad_service import VadService
@@ -68,3 +68,6 @@ app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(websocket.router, prefix="/ws", tags=["websocket"])
 app.include_router(benchmark.router, prefix="/api", tags=["benchmark"])
 app.include_router(translate.router, prefix="/api", tags=["translate"])
+app.include_router(user.router, prefix="/api", tags=["user"])
+app.include_router(sessions.router, prefix="/api", tags=["sessions"])
+app.include_router(tokens.router, prefix="/api", tags=["tokens"])
