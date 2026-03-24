@@ -50,19 +50,25 @@ fi
 # Claude'u başlat — CLAUDE.md'yi okuyup TODO.md'den görev alır
 tmux send-keys -t "$SESSION" "cd '$PROJ' && claude --dangerously-skip-permissions" Enter
 
+# Telegram köprüsünü ayrı pencerede başlat
+tmux new-window -t "$SESSION" -n "telegram"
+tmux send-keys -t "$SESSION:telegram" "cd '$PROJ' && bash telegram_bridge.sh" Enter
+
 # Telegram'a başlangıç bildirimi
 sleep 3
+ILKGOREV=$(grep '^\- \[ \]' TODO.md | head -1 | sed 's/- \[ \] //' | sed 's/\*\*[^*]*\*\* — //')
 curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
     -d "{
         \"chat_id\": \"${TELEGRAM_CHAT_ID}\",
-        \"text\": \"🚀 *Claude başladı*\nVersiyon: \`$VERSION\`\nGörev: $(grep '^\- \[ \]' TODO.md | head -1 | sed 's/- \[ \] //')\",
+        \"text\": \"🚀 *Claude başladı*\n📦 Versiyon: \`$VERSION\`\n🎯 Görev: $ILKGOREV\n\n📖 /yardim yaz komutları gör\",
         \"parse_mode\": \"Markdown\"
     }" > /dev/null 2>&1 || true
 
 echo -e "${GREEN}✓ Claude çalışıyor!${NC}"
+echo -e "${GREEN}✓ Telegram köprüsü aktif!${NC}"
 echo ""
-echo -e "📺 İzlemek:  ${YELLOW}tmux attach -t $SESSION${NC}"
+echo -e "📺 Claude:   ${YELLOW}tmux attach -t $SESSION${NC}"
+echo -e "📱 Telegram: ${YELLOW}tmux attach -t $SESSION:telegram${NC}"
 echo -e "📊 Durum:    ${YELLOW}./status.sh${NC}"
-echo -e "👁️  Canlı:    ${YELLOW}./watch.sh${NC}"
 echo -e "🛑 Durdurmak: ${YELLOW}tmux kill-session -t $SESSION${NC}"
