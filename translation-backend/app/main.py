@@ -58,8 +58,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Production'da değiştir
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # True + "*" WebSocket upgrade'i bloklar (Starlette 1.0)
     allow_methods=["*"],
     allow_headers=["*"],
 )
