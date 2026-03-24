@@ -55,3 +55,4 @@ e2e-test/last_*.log
 
 # APK releases
 *.apk
+.env
