@@ -9,6 +9,26 @@ Format: [Semantic Versioning](https://semver.org) | Branch: her geliştirme kend
 
 ---
 
+## [2.2.0] - 2026-03-24
+
+### Added
+- React Native UI: 5 tam ekran (Onboarding, Home, LiveTranslation, TokenShop, Profile)
+- FastAPI backend: `/api/user`, `/api/sessions`, `/api/tokens` router'ları
+- ApiService.ts: tüm endpoint'ler için typed singleton istemci
+- UserStore.ts: AsyncStorage'a dayalı kalıcı kullanıcı ayarları
+- GitHub Actions APK build pipeline (CI/CD)
+- Cloudflare tunnel URL APK içine gömülü (DEFAULT_URL)
+- GitHub Release otomasyonu (v0.1.1-debug APK)
+
+### Tests
+- `test_ui_backends.py` — 41 test, 41/41 geçti
+- TestUserProfile (6), TestUserTokens (3), TestSessions (8), TestSessionStats (4), TestTokenPackages (5), TestTokenPurchase (6), TestTokenDeduct (6)
+
+### Branch
+- `feature/ui-screens` → `develop`
+
+---
+
 ## [2.1.1] - 2026-03-24
 
 ### Fixed
