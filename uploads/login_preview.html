@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SubVoice - Login Preview</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --accent: #6c63ff;
+    --accent2: #ff6b6b;
+    --accent3: #43e97b;
+    --text: #f0f0f8;
+    --muted: #6b6b8a;
+    --border: rgba(108,99,255,0.2);
+    --input-bg: rgba(255,255,255,0.05);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .bg-orbs { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: float 8s ease-in-out infinite;
+  }
+  .orb-1 {
+    width: 350px; height: 350px;
+    background: radial-gradient(circle, rgba(108,99,255,0.18), transparent 70%);
+    top: -120px; left: -120px; animation-delay: 0s;
+  }
+  .orb-2 {
+    width: 280px; height: 280px;
+    background: radial-gradient(circle, rgba(255,107,107,0.12), transparent 70%);
+    bottom: 80px; right: -80px; animation-delay: -3s;
+  }
+  .orb-3 {
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(67,233,123,0.08), transparent 70%);
+    top: 45%; left: 55%; animation-delay: -5s;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-20px) scale(1.03); }
+  }
+
+  .phone-container {
+    width: 375px;
+    min-height: 812px;
+    background: var(--surface);
+    border-radius: 44px;
+    position: relative;
+    z-index: 10;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow:
+      0 0 0 1px rgba(108,99,255,0.1),
+      0 40px 80px rgba(0,0,0,0.6),
+      inset 0 1px 0 rgba(255,255,255,0.05);
+    animation: slideUp 0.8s cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(40px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .notch {
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 120px; height: 30px;
+    background: #000;
+    border-radius: 0 0 20px 20px;
+    z-index: 20;
+  }
+
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px 8px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .status-icons { display: flex; gap: 6px; align-items: center; }
+  .signal-bar { display: flex; gap: 2px; align-items: flex-end; }
+  .signal-bar span { width: 3px; background: var(--text); border-radius: 1px; opacity: 0.8; }
+  .signal-bar span:nth-child(1) { height: 4px; }
+  .signal-bar span:nth-child(2) { height: 6px; }
+  .signal-bar span:nth-child(3) { height: 9px; }
+  .signal-bar span:nth-child(4) { height: 12px; }
+  .battery {
+    width: 22px; height: 11px;
+    border: 1.5px solid rgba(255,255,255,0.7);
+    border-radius: 2px;
+    position: relative;
+    display: flex; align-items: center; padding: 1.5px;
+  }
+  .battery::after {
+    content: '';
+    position: absolute;
+    right: -4px; top: 50%;
+    transform: translateY(-50%);
+    width: 2px; height: 5px;
+    background: rgba(255,255,255,0.5);
+    border-radius: 0 1px 1px 0;
+  }
+  .battery-fill { height: 100%; width: 75%; background: var(--accent3); border-radius: 1px; }
+
+  /* Screen content */
+  .screen-content {
+    padding: 8px 28px 28px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Globe area */
+  .globe-area {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0 12px;
+  }
+
+  .globe-container {
+    width: 160px; height: 160px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulsate 3s ease-in-out infinite;
+  }
+
+  @keyframes pulsate {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+  }
+
+  .globe-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1.5px solid transparent;
+  }
+  .globe-ring-1 {
+    width: 160px; height: 160px;
+    border-color: rgba(108,99,255,0.6);
+    animation: spinRing 4s linear infinite;
+  }
+  .globe-ring-2 {
+    width: 128px; height: 128px;
+    border-color: rgba(255,107,107,0.4);
+    animation: spinRing 6s linear infinite reverse;
+  }
+  .globe-ring-3 {
+    width: 96px; height: 96px;
+    border-color: rgba(67,233,123,0.4);
+    animation: spinRing 3s linear infinite;
+  }
+
+  @keyframes spinRing {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  .globe-center {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    background: radial-gradient(135deg, rgba(108,99,255,0.7), rgba(108,99,255,0.15));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 40px rgba(108,99,255,0.5), inset 0 0 20px rgba(255,255,255,0.08);
+    font-size: 34px;
+    z-index: 5;
+  }
+
+  .lang-badge {
+    position: absolute;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    animation: floatBadge 4s ease-in-out infinite;
+    z-index: 10;
+  }
+  .lang-badge-1 {
+    background: rgba(108,99,255,0.15);
+    border: 1px solid rgba(108,99,255,0.4);
+    color: #a39dff;
+    top: 6px; right: -28px;
+    animation-delay: 0s;
+  }
+  .lang-badge-2 {
+    background: rgba(255,107,107,0.15);
+    border: 1px solid rgba(255,107,107,0.4);
+    color: #ff9d9d;
+    bottom: 8px; left: -38px;
+    animation-delay: -1.5s;
+  }
+  .lang-badge-3 {
+    background: rgba(67,233,123,0.15);
+    border: 1px solid rgba(67,233,123,0.4);
+    color: #7dffa6;
+    top: 38px; left: -44px;
+    animation-delay: -3s;
+  }
+
+  @keyframes floatBadge {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  /* App badge */
+  .app-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(108,99,255,0.15);
+    border: 1px solid rgba(108,99,255,0.3);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 10px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    color: #a39dff;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    align-self: flex-start;
+  }
+  .app-badge-dot {
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent);
+    animation: dotPulse 1.5s ease-in-out infinite;
+  }
+  @keyframes dotPulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 8px var(--accent); }
+    50% { transform: scale(1.4); box-shadow: 0 0 14px var(--accent); }
+  }
+
+  /* Title */
+  .hero-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 10px;
+    letter-spacing: -0.02em;
+  }
+  .hero-title span {
+    background: linear-gradient(135deg, #6c63ff, #ff6b6b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-desc {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+
+  /* Form */
+  .form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+
+  .input-wrapper {
+    display: flex;
+    align-items: center;
+    background: var(--input-bg);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    padding: 0 16px;
+    height: 54px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .input-wrapper:focus-within {
+    border-color: var(--accent);
+    background: rgba(108,99,255,0.08);
+  }
+  .input-icon { font-size: 16px; margin-right: 10px; }
+
+  .input-wrapper input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+  }
+  .input-wrapper input::placeholder { color: var(--muted); }
+
+  .forgot-btn {
+    align-self: flex-end;
+    font-size: 13px;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .forgot-btn:hover { text-decoration: underline; }
+
+  /* Buttons */
+  .btn-primary {
+    width: 100%;
+    height: 54px;
+    background: var(--accent);
+    border: none;
+    border-radius: 16px;
+    color: white;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(108,99,255,0.45);
+    transition: transform 0.15s, box-shadow 0.15s;
+    letter-spacing: 0.02em;
+  }
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+    animation: shimmer 3s infinite;
+  }
+  @keyframes shimmer {
+    from { left: -100%; }
+    to   { left: 100%; }
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(108,99,255,0.55); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-secondary {
+    width: 100%;
+    height: 50px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .btn-secondary:hover { border-color: rgba(108,99,255,0.4); color: var(--text); }
+
+  /* Divider */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .divider-line { flex: 1; height: 1px; background: var(--border); }
+  .divider-text { font-size: 12px; color: var(--muted); }
+
+  /* Guest btn */
+  .btn-guest {
+    width: 100%;
+    height: 40px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .btn-guest:hover { color: var(--text); }
+
+  /* Home indicator */
+  .home-indicator {
+    width: 134px; height: 5px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+    margin: 12px auto 0;
+  }
+</style>
+</head>
+<body>
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <div class="phone-container">
+    <div class="notch"></div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span>9:41</span>
+      <div class="status-icons">
+        <div class="signal-bar">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <span style="font-size:10px;">WiFi</span>
+        <div class="battery"><div class="battery-fill"></div></div>
+      </div>
+    </div>
+
+    <div class="screen-content">
+
+      <!-- Globe -->
+      <div class="globe-area">
+        <div class="globe-container">
+          <div class="globe-ring globe-ring-1"></div>
+          <div class="globe-ring globe-ring-2"></div>
+          <div class="globe-ring globe-ring-3"></div>
+          <div class="globe-center">🌍</div>
+
+          <div class="lang-badge lang-badge-1">English 🇺🇸</div>
+          <div class="lang-badge lang-badge-2">Türkçe 🇹🇷</div>
+          <div class="lang-badge lang-badge-3">日本語 🇯🇵</div>
+        </div>
+      </div>
+
+      <!-- Badge -->
+      <div class="app-badge">
+        <div class="app-badge-dot"></div>
+        SubVoice AI
+      </div>
+
+      <!-- Title -->
+      <h1 class="hero-title">
+        Tekrar<br>
+        <span>hoş geldin</span>
+      </h1>
+      <p class="hero-desc">
+        Hesabına giriş yap ve altyazılarına kaldığın yerden devam et.
+      </p>
+
+      <!-- Form -->
+      <div class="form">
+        <div class="input-wrapper">
+          <span class="input-icon">✉️</span>
+          <input type="email" placeholder="E-posta adresi">
+        </div>
+        <div class="input-wrapper">
+          <span class="input-icon">🔒</span>
+          <input type="password" placeholder="Şifre">
+        </div>
+        <a class="forgot-btn">Şifremi unuttum</a>
+      </div>
+
+      <!-- Buttons -->
+      <button class="btn-primary">Giriş Yap →</button>
+      <button class="btn-secondary">Hesap oluştur</button>
+
+      <!-- Divider -->
+      <div class="divider">
+        <div class="divider-line"></div>
+        <span class="divider-text">veya</span>
+        <div class="divider-line"></div>
+      </div>
+
+      <button class="btn-guest">Misafir olarak devam et</button>
+
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+</body>
+</html>

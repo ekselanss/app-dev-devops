@@ -1,0 +1,58 @@
+name: Android APK Build
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+          cache-dependency-path: VideoTranslatorApp/package-lock.json
+
+      - name: Install JS dependencies
+        working-directory: VideoTranslatorApp
+        run: npm ci
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('VideoTranslatorApp/android/**/*.gradle*', 'VideoTranslatorApp/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
+      - name: Make gradlew executable
+        working-directory: VideoTranslatorApp/android
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        working-directory: VideoTranslatorApp/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: subvoice-debug-${{ github.sha }}
+          path: VideoTranslatorApp/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
