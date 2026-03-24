@@ -111,7 +111,12 @@ class TranslationService:
 
         try:
             if self.deepl_api_key:
-                result = await self._translate_deepl(text, source_language, target_language)
+                try:
+                    result = await self._translate_deepl(text, source_language, target_language)
+                except Exception as deepl_err:
+                    logger.warning(f"⚠️ DeepL başarısız, Google'a geçiliyor: {deepl_err}")
+                    result = await self._translate_google(text, source_language, target_language)
+                    result["fallback"] = True
             else:
                 result = await self._translate_google(text, source_language, target_language)
 
@@ -124,7 +129,7 @@ class TranslationService:
             return result
 
         except Exception as e:
-            logger.error(f"Çeviri hatası: {e}")
+            logger.error(f"Çeviri hatası (tüm sağlayıcılar başarısız): {e}")
             return {
                 "translated": f"[Çeviri hatası: {str(e)}]",
                 "source_language": source_language,
