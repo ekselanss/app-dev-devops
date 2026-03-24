@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@videocheviri_server_url';
 const TIER_STORAGE_KEY = '@videocheviri_tier';
-const DEFAULT_URL = 'https://stable-opponents-italic-herb.trycloudflare.com';
+const DEFAULT_URL = 'https://norman-bob-hiring-adjust.trycloudflare.com';
 
 let cachedUrl: string | null = null;
 let cachedTier: 'free' | 'pro' = 'free';
