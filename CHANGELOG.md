@@ -9,6 +9,21 @@ Format: [Semantic Versioning](https://semver.org) | Branch: her geliştirme kend
 
 ---
 
+## [2.1.1] - 2026-03-24
+
+### Fixed
+- DeepL API başarısız olunca Google Translate'e otomatik geçiş yapılıyor
+- Kullanıcı artık çeviri hatası görmüyor, fallback şeffaf çalışıyor
+- Response'a `fallback: true` flag'i eklendi (debugging için)
+
+### Branch
+- `fix/google-translate-fallback` → `develop`
+
+### Tests
+- `test_translation_fallback.py` — 6 test, 6/6 geçti
+
+---
+
 ## [2.1.0] - 2026-03-24
 
 ### Added
